@@ -11,11 +11,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c645df16-3b33-4d47-9389-c540bf4ba500" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/ColorMage.uproject" beforeDir="false" afterPath="$PROJECT_DIR$/ColorMage.uproject" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownCharacter.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownController.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownController.uasset" afterDir="false" />
-    </list>
+    <list default="true" id="c645df16-3b33-4d47-9389-c540bf4ba500" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -464,7 +460,7 @@
       <workItem from="1761148035227" duration="63000" />
       <workItem from="1761148111972" duration="1000000" />
       <workItem from="1761150882862" duration="817000" />
-      <workItem from="1761418426712" duration="610000" />
+      <workItem from="1761418426712" duration="951000" />
     </task>
     <servers />
   </component>
