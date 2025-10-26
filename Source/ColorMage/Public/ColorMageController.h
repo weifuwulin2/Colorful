@@ -29,10 +29,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> MoveAction;
 	
-	// (未来可以在这里添加 IA_Possess, IA_ExtractColor 等)
-	// UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	// TObjectPtr<UInputAction> PossessAction;
+	/** Interact Action (RMB). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> InteractAction;
 
+	/** Max distance for the RMB interaction line trace. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
+	float InteractionDistance = 10000.0f;
+	
 	protected:
 	/** 当控制器附身到一个Pawn时调用 */
 	virtual void OnPossess(APawn* InPawn) override;
@@ -49,6 +53,6 @@ private:
 	 */
 	void HandleMove(const FInputActionValue& Value);
 
-	// (未来可以添加)
-	// void HandlePossess(const FInputActionValue& Value);
+	/** Called to handle RMB interaction. */
+	void OnInteract();
 };

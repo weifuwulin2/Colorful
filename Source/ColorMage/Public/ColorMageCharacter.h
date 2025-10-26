@@ -7,6 +7,8 @@
 #include "GameFramework/Character.h"
 #include "ColorMageCharacter.generated.h"
 
+class AColorProjectile;
+
 UCLASS()
 class COLORMAGE_API AColorMageCharacter : public ACharacter
 {
@@ -27,6 +29,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> DashAction;
 
+	/** Fire Projectile Action (LMB). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> FireProjectileAction; // <--- NEW
+
 	// --- 冲刺 (Dash) 设定 ---
 
 	/** 冲刺时播放的动画蒙太奇 */
@@ -41,6 +47,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	float DashDuration = 0.25f;
 
+	// --- Projectile Config ---
+
+	/** The C++ class of the projectile to spawn (e.g., BP_ColorProjectile). */
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	TSubclassOf<AColorProjectile> ProjectileClass; // <--- NEW
+
+	/** Socket name on the mesh (e.g., the "BrushTip") to spawn from. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+	FName ProjectileSpawnSocketName = "BrushTip"; // <--- NEW
+	
 private:
 	/** 用来存储角色原始的重力大小 */
 	float DefaultGravityScale;
@@ -66,4 +82,7 @@ protected:
 
 	/** 当冲刺时长结束后，用来恢复重力和停止冲刺的函数 */
 	void OnDashFinished();
+
+	/** Called by LMB to fire a projectile. */
+	void OnFireProjectile(); // <--- NEW
 };

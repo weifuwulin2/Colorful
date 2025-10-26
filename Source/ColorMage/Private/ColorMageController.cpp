@@ -1,7 +1,10 @@
 #include "ColorMageController.h"
+
+#include "ColorManagerSubsystem.h"
 #include "GameFramework/Pawn.h"
 #include "EnhancedInputSubsystems.h" // 包含 Subsystem
 #include "EnhancedInputComponent.h"   // 包含 Enhanced Input Component
+#include "Kismet/KismetSystemLibrary.h"
 
 AColorMageController::AColorMageController()
 {
@@ -46,11 +49,11 @@ void AColorMageController::SetupInputComponent()
 			EnhancedInputComp->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AColorMageController::HandleMove);
 		}
 
-		// (未来可以在这里绑定你的其他 Action)
-		// if (PossessAction)
-		// {
-		//    EnhancedInputComp->BindAction(PossessAction, ETriggerEvent::Started, this, &AColorMageController::HandlePossess);
-		// }
+		// Bind Interact (RMB). This is here so you can interact no matter what body you're in.
+		if (InteractAction)
+		{
+			EnhancedInputComp->BindAction(InteractAction, ETriggerEvent::Started, this, &AColorMageController::OnInteract);
+		}
 	}
 }
 
@@ -91,5 +94,42 @@ void AColorMageController::HandleMove(const FInputActionValue& Value)
 	if (MoveVector.X != 0.0f)
 	{
 		MyPawn->AddMovementInput(RightDirection, MoveVector.X);
+	}
+}
+
+// Interaction logic (RMB)
+void AColorMageController::OnInteract()
+{
+	// 1. Perform Line Trace
+	FVector CameraLocation;
+	FRotator CameraRotation;
+	GetPlayerViewPoint(CameraLocation, CameraRotation);
+
+	FVector TraceStart = CameraLocation;
+	FVector TraceEnd = TraceStart + (CameraRotation.Vector() * InteractionDistance);
+
+	FHitResult HitResult;
+	bool bHit = UKismetSystemLibrary::LineTraceSingle(
+		this,
+		TraceStart,
+		TraceEnd,
+		ETraceTypeQuery::TraceTypeQuery1, // Visibility channel
+		false,
+		TArray<AActor*>(),
+		EDrawDebugTrace::None, // Change to ForDuration to debug
+		HitResult,
+		true
+	);
+	
+	if (bHit && HitResult.GetActor())
+	{
+		// 2. Get the Color Manager Subsystem
+		UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
+
+		if (ColorManager)
+		{
+			// 3. "Outsource" the logic to the subsystem
+			ColorManager->HandlePlayerInteraction(this, HitResult.GetActor());
+		}
 	}
 }

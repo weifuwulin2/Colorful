@@ -1,89 +1,127 @@
+// ColorMageCharacter.cpp
 #include "ColorMageCharacter.h"
 #include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Animation/AnimInstance.h"
+#include "GameFramework/PlayerController.h" // Needed to get PlayerState
+#include "ColorMagePlayerState.h"        // Needed to get color
+#include "ColorProjectile.h"              // Needed to spawn projectile
 
 AColorMageCharacter::AColorMageCharacter()
 {
-	// 构造函数...
-	DefaultGravityScale = 1.0f; // 先设个默认值
+	DefaultGravityScale = 1.0f;
 }
 
 void AColorMageCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
-	// 在游戏开始时，获取并存储角色移动组件的默认重力
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		DefaultGravityScale = MoveComp->GravityScale;
 	}
 }
 
+// Binds inputs specific to this Character body
 void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	// 确保我们使用的是 Enhanced Input Component
 	if (UEnhancedInputComponent* EnhancedInputComp = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		// --- 绑定跳跃 (Space) ---
+		// Bind Jump
 		if (JumpAction)
 		{
-			// ACharacter 自带了 Jump() 和 StopJumping() 函数
 			EnhancedInputComp->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 			EnhancedInputComp->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 		}
 
-		// --- 绑定冲刺 (Shift) ---
+		// Bind Dash
 		if (DashAction)
 		{
-			// 当按键“按下” (Started) 时，触发 OnDash 函数
 			EnhancedInputComp->BindAction(DashAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnDash);
+		}
+		
+		// --- NEW: Bind Fire Projectile (LMB) ---
+		if (FireProjectileAction)
+		{
+			EnhancedInputComp->BindAction(FireProjectileAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnFireProjectile);
 		}
 	}
 }
 
-/**
- * 执行冲刺的核心逻辑
- */
-void AColorMageCharacter::OnDash()
+// --- NEW: Fire Projectile Logic ---
+void AColorMageCharacter::OnFireProjectile()
 {
-	// --- 1. 安全检查 ---
-	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
-	if (!MoveComp)
+	// 1. Get Player Controller and Player State
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC) return;
+
+	AColorMagePlayerState* PS = PC->GetPlayerState<AColorMagePlayerState>();
+	if (!PS) return;
+
+	// 2. Get the color to fire
+	EColor ColorToFire = PS->GetCurrentColor();
+
+	// 3. Check if we have a color (can't fire "Gray")
+	if (ColorToFire == EColor::EC_None)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Fire Failed: No color equipped."));
+		// (Play "no ammo" sound)
 		return;
 	}
 
-	// 检查：是否已经在冲刺中？
-	if (MoveComp->GravityScale != DefaultGravityScale)
+	// 4. Check if we have a valid Projectile Class assigned
+	if (!ProjectileClass)
 	{
+		UE_LOG(LogTemp, Error, TEXT("Fire Failed: ProjectileClass is not set in BP_ColorMageCharacter."));
 		return;
 	}
+
+	// 5. Get spawn location and rotation
+	FVector SpawnLocation = GetMesh()->GetSocketLocation(ProjectileSpawnSocketName);
+	// Fire in the direction the camera is facing
+	FRotator SpawnRotation = PC->GetControlRotation(); 
+
+	// 6. Set spawn parameters
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	// 7. Spawn the projectile
+	AColorProjectile* Projectile = GetWorld()->SpawnActor<AColorProjectile>(
+		ProjectileClass,
+		SpawnLocation,
+		SpawnRotation,
+		SpawnParams
+	);
+
+	if (Projectile)
+	{
+		// 8. Tell the projectile what color it is
+		Projectile->SetProjectileColor(ColorToFire);
+		// (Play "Fire" animation montage)
+	}
+}
+
+// --- Dash Logic (Unchanged) ---
+void AColorMageCharacter::OnDash()
+{
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp || MoveComp->GravityScale != DefaultGravityScale) return;
 	
-	// --- 2. 播放动画 ---
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && DashMontage)
 	{
 		AnimInstance->Montage_Play(DashMontage);
 	}
 	
-	// --- 3. 计算冲刺速度 ---
 	const float DashSpeed = DashDistance / DashDuration;
-	const FVector ForwardDir = GetActorForwardVector();
-	const FVector DashVelocity = ForwardDir * DashSpeed;
+	const FVector DashVelocity = GetActorForwardVector() * DashSpeed;
 
-	// --- 4. 执行冲刺 (核心) ---
-	
-	// a. 【修正】暂时关闭重力，直接设置属性
 	MoveComp->GravityScale = 0.0f;
-
-	// b. 使用 LaunchCharacter 给予一个瞬间的爆发速度
 	LaunchCharacter(DashVelocity, true, true);
 
-	// --- 5. 设置计时器，在 DashDuration 结束后恢复一切 ---
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashFinished);
 	GetWorld()->GetTimerManager().SetTimer(
 		TimerHandle_DashFinished,
@@ -94,20 +132,11 @@ void AColorMageCharacter::OnDash()
 	);
 }
 
-/**
- * 冲刺结束时调用的恢复函数
- */
 void AColorMageCharacter::OnDashFinished()
 {
 	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
-	if (!MoveComp)
-	{
-		return;
-	}
+	if (!MoveComp) return;
 
-	// 1. 【修正】恢复重力，直接设置属性
 	MoveComp->GravityScale = DefaultGravityScale;
-
-	// 2. (可选) 立即停止当前的冲刺速度
 	MoveComp->StopMovementImmediately();
 }

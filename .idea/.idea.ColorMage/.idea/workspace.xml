@@ -11,7 +11,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c645df16-3b33-4d47-9389-c540bf4ba500" name="Changes" comment="" />
+    <list default="true" id="c645df16-3b33-4d47-9389-c540bf4ba500" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.ColorMage/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ColorMage/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ColorMage/Private/ColorMageCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ColorMage/Private/ColorMageCharacter.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ColorMage/Private/ColorMageController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ColorMage/Private/ColorMageController.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ColorMage/Public/ColorMageCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ColorMage/Public/ColorMageCharacter.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ColorMage/Public/ColorMageController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ColorMage/Public/ColorMageController.h" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -460,7 +466,8 @@
       <workItem from="1761148035227" duration="63000" />
       <workItem from="1761148111972" duration="1000000" />
       <workItem from="1761150882862" duration="817000" />
-      <workItem from="1761418426712" duration="951000" />
+      <workItem from="1761418426712" duration="1824000" />
+      <workItem from="1761500285039" duration="1124000" />
     </task>
     <servers />
   </component>
