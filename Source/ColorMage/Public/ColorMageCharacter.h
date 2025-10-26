@@ -13,100 +13,78 @@ class AColorProjectile;
 UCLASS()
 class COLORMAGE_API AColorMageCharacter : public ACharacter
 {
-	GENERATED_BODY()
+GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
 	AColorMageCharacter();
 
 protected:
-	// --- Enhanced Input 资产 ---
-
-	/** 跳跃 (Space) */
+	// --- Input Assets ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> JumpAction;
 
-	/** 冲刺 (Shift) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> DashAction;
 
-	/** Fire Projectile Action (LMB). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	TObjectPtr<UInputAction> FireProjectileAction; // <--- NEW
-
-	/** Aim Action (RMB Hold) */
+	TObjectPtr<UInputAction> FireProjectileAction;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	TObjectPtr<UInputAction> AimAction; // <--- NEW
+	TObjectPtr<UInputAction> AimAction;
 
 	// --- Camera Default Values ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	float DefaultCameraDist = 600.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
-	FVector DefaultCameraOffset = FVector(0.0f, 0.0f, 0.0f);
+	FVector DefaultCameraOffset = FVector(0.0f, 60.0f, 40.0f);
 
 	// --- Camera Aiming Values ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	float AimingCameraDist = 150.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	FVector AimingCameraOffset = FVector(0.0f, 70.0f, 50.0f);
-	
-	// --- 冲刺 (Dash) 设定 ---
 
-	/** 冲刺时播放的动画蒙太奇 */
+	// --- Dash Config ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	TObjectPtr<UAnimMontage> DashMontage;
-
-	/** 冲刺的距离 (单位: cm) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	float DashDistance = 1000.0f;
-
-	/** 完成冲刺所需的时长 (单位: 秒) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	float DashDuration = 0.25f;
 
 	// --- Projectile Config ---
-
-	/** The C++ class of the projectile to spawn (e.g., BP_ColorProjectile). */
 	UPROPERTY(EditDefaultsOnly, Category = "Combat")
-	TSubclassOf<AColorProjectile> ProjectileClass; // <--- NEW
-
-	/** Socket name on the mesh (e.g., the "BrushTip") to spawn from. */
+	TSubclassOf<AColorProjectile> ProjectileClass;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
-	FName ProjectileSpawnSocketName = "BrushTip"; // <--- NEW
-	
-private:
-	/** 用来存储角色原始的重力大小 */
-	float DefaultGravityScale;
+	FName ProjectileSpawnSocketName = "BrushTip";
 
-	/** 用来在冲刺结束后恢复设置的计时器句柄 */
+private:
+	// --- Cached Components & Timers ---
+	TObjectPtr<USpringArmComponent> CameraSpringArm;
+	float DefaultGravityScale;
 	FTimerHandle TimerHandle_DashFinished;
 
-	/** Cached reference to the SpringArm component */
-	UPROPERTY()
-	TObjectPtr<USpringArmComponent> CameraSpringArm;
-	
-protected:
-	/** 在游戏开始时调用 */
-	virtual void BeginPlay() override;
+	/** Timer to automatically exit Aim Mode after firing */
+	FTimerHandle TimerHandle_AutoAimReset;
 
-	/** 绑定输入 */
+	/** Tracks if the player is holding the Aim button */
+	bool bIsManuallyAiming = false; // <--- NEW STATE
+
+protected:
+	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	// --- 输入处理函数 ---
-
-	/** 处理跳跃 (已有的 ACharacter::Jump) */
-	// ACharacter 已经内置了 Jump 函数, 我们直接绑定即可
-
-	/** 处理冲刺 (我们自己实现) */
+	// --- Input Handlers ---
 	void OnDash();
-
-	/** 当冲刺时长结束后，用来恢复重力和停止冲刺的函数 */
 	void OnDashFinished();
-
-	/** Called by LMB to fire a projectile. */
-	void OnFireProjectile(); // <--- NEW
-
-	// --- NEW Aiming Functions ---
+	void OnFireProjectile();
 	void OnAimStarted();
 	void OnAimCompleted();
+
+	// --- NEW HELPER FUNCTIONS ---
+	/** Contains the logic to enter the aiming state */
+	void EnterAimState();
+	
+	/** Contains the logic to exit the aiming state (with a safety check) */
+	void ExitAimState();
 };
