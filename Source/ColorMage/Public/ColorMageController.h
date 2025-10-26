@@ -33,18 +33,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> InteractAction;
 
+	/** 摄像机观看 (鼠标移动) <-- [!! 新增 !!] */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> LookAction;
+	
 	/** Max distance for the RMB interaction line trace. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
 	float InteractionDistance = 10000.0f;
 	
-	protected:
+protected:
 	/** 当控制器附身到一个Pawn时调用 */
 	virtual void OnPossess(APawn* InPawn) override;
 
 	/** 设置输入组件 */
 	virtual void SetupInputComponent() override;
-
-private:
+	
 	// --- 输入处理函数 ---
 
 	/**
@@ -55,4 +58,6 @@ private:
 
 	/** Called to handle RMB interaction. */
 	void OnInteract();
+	/** 处理鼠标观看的函数 <-- [!! 新增 !!] */
+	void HandleLook(const FInputActionValue& Value);
 };

@@ -6,6 +6,9 @@
 #include "GameFramework/PlayerController.h" // Needed to get PlayerState
 #include "ColorMagePlayerState.h"        // Needed to get color
 #include "ColorProjectile.h"              // Needed to spawn projectile
+#include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/SpringArmComponent.h"
 
 AColorMageCharacter::AColorMageCharacter()
 {
@@ -18,6 +21,14 @@ void AColorMageCharacter::BeginPlay()
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		DefaultGravityScale = MoveComp->GravityScale;
+	}
+	
+	CameraSpringArm = FindComponentByClass<USpringArmComponent>();
+	if (CameraSpringArm)
+	{
+		// Store the default values from the component
+		DefaultCameraDist = CameraSpringArm->TargetArmLength;
+		DefaultCameraOffset = CameraSpringArm->SocketOffset;
 	}
 }
 
@@ -46,6 +57,53 @@ void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		{
 			EnhancedInputComp->BindAction(FireProjectileAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnFireProjectile);
 		}
+
+		// --- NEW: Bind Aiming ---
+		if (AimAction)
+		{
+			// Started = Pressed, Completed = Released
+			EnhancedInputComp->BindAction(AimAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnAimStarted);
+			EnhancedInputComp->BindAction(AimAction, ETriggerEvent::Completed, this, &AColorMageCharacter::OnAimCompleted);
+		}
+	}
+}
+
+// --- NEW FUNCTION: Called when RMB is PRESSED ---
+void AColorMageCharacter::OnAimStarted()
+{
+	// 1. Lock character rotation to camera
+	// We must get the movement component first
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->bUseControllerDesiredRotation = true;
+		// 2. Stop character from turning with movement (so we can strafe)
+		MoveComp->bOrientRotationToMovement = false;
+	}
+
+	// 3. "Snap" the camera to the aiming position
+	if (CameraSpringArm)
+	{
+		CameraSpringArm->TargetArmLength = AimingCameraDist;
+		CameraSpringArm->SocketOffset = AimingCameraOffset;
+	}
+}
+
+// --- NEW FUNCTION: Called when RMB is RELEASED ---
+void AColorMageCharacter::OnAimCompleted()
+{
+	// 1. Unlock character rotation from camera
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->bUseControllerDesiredRotation = false;
+		// 2. Let character turn with movement again
+		MoveComp->bOrientRotationToMovement = true;
+	}
+
+	// 3. "Snap" the camera back to default
+	if (CameraSpringArm)
+	{
+		CameraSpringArm->TargetArmLength = DefaultCameraDist;
+		CameraSpringArm->SocketOffset = DefaultCameraOffset;
 	}
 }
 

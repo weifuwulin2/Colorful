@@ -13,63 +13,16 @@
   <component name="ChangeListManager">
     <list default="true" id="c645df16-3b33-4d47-9389-c540bf4ba500" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.ColorMage/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ColorMage/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config/DefaultEditor.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEditor.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Input/Action/IA_Attack.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/ColorMage/Blueprints/BP_ColorMageCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/ColorMage/Blueprints/BP_ColorMageCharacter.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/ColorMage/Blueprints/BP_ColorMageController.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/ColorMage/Blueprints/BP_ColorMageController.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/ColorMage/Input/Actions/IA_SetDestination_Click.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/ColorMage/Input/Actions/IA_SetDestination_Touch.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/ColorMage/Input/IMC_Default.uasset" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Input/IMC_Default.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Input/IMC_Default.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_ColorMageCharacter.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownController.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownGameMode.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/TopDown/Blueprints/BP_TopDownGameMode.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Input/Actions/IA_SetDestination_Click.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Input/Actions/IA_SetDestination_Touch.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Input/IMC_Default.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/TopDown/Maps/TopDownMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/TopDown/Maps/TopDownMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/0/78/FBR4X3QS2U1JDDOL41R95K.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/0/FD/H6232UBBQPM7MPPYTG2MZ1.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/0/MB/J5WHCOZ4GU1YICRISB3DL6.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/0/QS/8AKCSH4RXXQHHQMCR8GO6C.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/0/WM/EHOX3YPZ8BWS13D7E6IFN2.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/1/N6/CYTTPPQCP2OI3P1OI4WUFB.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/2/PP/0FWE1XT4SIGHXZQ61E0BPN.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/3/16/IU32BEDS8KCRBPZIQZ3317.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/3/RG/XOAZMB5QVL20UGXOCZ1LZK.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/4/JM/X44XFRDRREXGEQX2XXU55Y.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/4/KC/H7JQHYU4KG28SR2JBQIYN0.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/5/LH/V6N3G2I7QT53NAD6H1AD04.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/5/UT/JRUWL9PVCAH3XSUMXP4CC1.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/5/YN/TCNGOWDVRBFBJ5YZR7VI7S.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/6/BO/BYV4KSLUROOOL33DU1XUWQ.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/6/GY/HOVAYB977GD5L9YGZ5S1T6.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/6/IH/VGSY15OFA48JW2MQVTVU8L.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/6/MJ/LYN3KFSLDFET0H4R4QA9WK.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/6/OC/6QBECPUWZX0A7KBRQFRI0M.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/6/OI/H4CYGWRMJ49ZI6AS2GNGQY.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/6/VI/ESHAVRHFZFA2JDR9ZAQIOE.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/7/43/KCOU8O5LTCF16FPA9RNLK8.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/7/EJ/7JCMZ75LZ4IDNH7SV7SZBW.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/7/V9/FYE97PCQGKIRUDX9FB1QCI.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/7/WV/FF6LPDZ0FKKLS0GFFG7RY1.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/8/R1/ENMI5ZSH5EMTVMF7P7JJ6A.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/8/YS/FOXTUL6MPN05XEWRDRZ58J.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/9/D3/60ORICH9SPD98P0GDB2WTP.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/9/FF/BLNOD0XLYQT896YMNZB2SL.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/9/FY/45JOQ38QR4K2P62IGCH99F.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/A/5K/NUNDGACQMY4LFPLTZJH6GW.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/A/JS/24450VHCRABFZNLJT222WG.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/A/LM/VRK8UAZR3J2TAKS74SHCUD.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/A/RN/FHX05LPSBNMAJG3SW97PS7.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/A/SY/Y8475SUVOZMH0COV8H1Q7T.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/B/72/PR1QS01SW5BWFPFZ9C79RF.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/B/AX/QD7MAQAIBJ16OYN5ZXXIUV.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/B/PL/MYXGV0RBWT3ZBX00KVP1IE.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/C/MV/UE2U7GTDT7WM2AVP83861S.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/E/0I/PFMFMMAZFLT0NTV2ZAO8OA.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalActors__/TopDown/Maps/TopDownMap/E/LR/47NTFRDFK6M7265A1UYTOW.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalObjects__/TopDown/Maps/TopDownMap/6/KJ/HGBHM24D5RXIQ0FWMWET5K.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalObjects__/TopDown/Maps/TopDownMap/9/MO/AZY0AOCU6MT12X33M79BLC.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalObjects__/TopDown/Maps/TopDownMap/B/IZ/V53VD7S5CH66M4UN86LGPN.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalObjects__/TopDown/Maps/TopDownMap/D/FN/VRYS880XJBXM2TZ3BMHY3F.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/__ExternalObjects__/TopDown/Maps/TopDownMap/F/0J/88V6S5OJPUKZELI3DWMECQ.uasset" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/ColorMage/Private/ColorMageCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ColorMage/Private/ColorMageCharacter.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ColorMage/Private/ColorMageController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ColorMage/Private/ColorMageController.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ColorMage/Public/ColorMageCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ColorMage/Public/ColorMageCharacter.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/ColorMage/Public/ColorMageController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/ColorMage/Public/ColorMageController.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -520,7 +473,7 @@
       <workItem from="1761148111972" duration="1000000" />
       <workItem from="1761150882862" duration="817000" />
       <workItem from="1761418426712" duration="1824000" />
-      <workItem from="1761500285039" duration="3379000" />
+      <workItem from="1761500285039" duration="5529000" />
     </task>
     <servers />
   </component>

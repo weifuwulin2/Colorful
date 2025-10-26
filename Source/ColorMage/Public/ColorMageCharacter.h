@@ -7,6 +7,7 @@
 #include "GameFramework/Character.h"
 #include "ColorMageCharacter.generated.h"
 
+class USpringArmComponent;
 class AColorProjectile;
 
 UCLASS()
@@ -33,6 +34,22 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> FireProjectileAction; // <--- NEW
 
+	/** Aim Action (RMB Hold) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> AimAction; // <--- NEW
+
+	// --- Camera Default Values ---
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+	float DefaultCameraDist = 600.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+	FVector DefaultCameraOffset = FVector(0.0f, 0.0f, 0.0f);
+
+	// --- Camera Aiming Values ---
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+	float AimingCameraDist = 150.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+	FVector AimingCameraOffset = FVector(0.0f, 70.0f, 50.0f);
+	
 	// --- 冲刺 (Dash) 设定 ---
 
 	/** 冲刺时播放的动画蒙太奇 */
@@ -64,7 +81,10 @@ private:
 	/** 用来在冲刺结束后恢复设置的计时器句柄 */
 	FTimerHandle TimerHandle_DashFinished;
 
-
+	/** Cached reference to the SpringArm component */
+	UPROPERTY()
+	TObjectPtr<USpringArmComponent> CameraSpringArm;
+	
 protected:
 	/** 在游戏开始时调用 */
 	virtual void BeginPlay() override;
@@ -85,4 +105,8 @@ protected:
 
 	/** Called by LMB to fire a projectile. */
 	void OnFireProjectile(); // <--- NEW
+
+	// --- NEW Aiming Functions ---
+	void OnAimStarted();
+	void OnAimCompleted();
 };

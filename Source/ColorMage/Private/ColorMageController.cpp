@@ -8,28 +8,39 @@
 
 AColorMageController::AColorMageController()
 {
-	// 构造函数...
+	
 }
 
 void AColorMageController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	// --- 关键步骤：添加 Input Mapping Context ---
-
-	// 1. 获取本地玩家的 Enhanced Input Subsystem
+	// --- 添加 Input Mapping Context ---
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		// 2. 清除可能存在的旧映射 (可选，但通常是好习惯)
 		Subsystem->ClearAllMappings();
-
-		// 3. 检查我们的 IMC 资产是否有效
 		if (DefaultInputMappingContext)
 		{
-			// 4. 添加我们的 IMC，优先级设为0
 			Subsystem->AddMappingContext(DefaultInputMappingContext, 0);
 		}
 	}
+	
+	if (PlayerCameraManager)
+	{
+		// Set limits (e.g., -70 degrees down, +80 degrees up)
+		PlayerCameraManager->ViewPitchMin = -70.0f;
+		PlayerCameraManager->ViewPitchMax = 10.0f;
+	}
+    
+	// --- [!! 修复鼠标 !!] ---
+	// 在设置输入模式之前，再次强制隐藏鼠标
+	bShowMouseCursor = false;
+    
+	// 这将锁定鼠标到视口内并隐藏它
+	FInputModeGameOnly InputMode;
+	InputMode.SetConsumeCaptureMouseDown(true); 
+	SetInputMode(InputMode);
+	// --- [!! 修复结束 !!] ---
 }
 
 void AColorMageController::SetupInputComponent()
@@ -53,6 +64,12 @@ void AColorMageController::SetupInputComponent()
 		if (InteractAction)
 		{
 			EnhancedInputComp->BindAction(InteractAction, ETriggerEvent::Started, this, &AColorMageController::OnInteract);
+		}
+
+		// 绑定观看 (Look)
+		if (LookAction)
+		{
+			EnhancedInputComp->BindAction(LookAction, ETriggerEvent::Triggered, this, &AColorMageController::HandleLook);
 		}
 	}
 }
@@ -131,5 +148,22 @@ void AColorMageController::OnInteract()
 			// 3. "Outsource" the logic to the subsystem
 			ColorManager->HandlePlayerInteraction(this, HitResult.GetActor());
 		}
+	}
+}
+
+void AColorMageController::HandleLook(const FInputActionValue& Value)
+{
+	const FVector2D LookVector = Value.Get<FVector2D>();
+
+	if (LookVector.X != 0.0f)
+	{
+		AddYawInput(LookVector.X); // Left/Right is normal
+	}
+    
+	if (LookVector.Y != 0.0f)
+	{
+		// --- [!! PITCH INVERT !!] ---
+		// Add a negative sign to invert the Y-axis
+		AddPitchInput(-LookVector.Y);
 	}
 }
