@@ -49,7 +49,7 @@ void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	}
 }
 
-// --- NEW: Fire Projectile Logic ---
+// --- MODIFIED: Fire Projectile Logic ---
 void AColorMageCharacter::OnFireProjectile()
 {
 	// 1. Get Player Controller and Player State
@@ -62,13 +62,16 @@ void AColorMageCharacter::OnFireProjectile()
 	// 2. Get the color to fire
 	EColor ColorToFire = PS->GetCurrentColor();
 
-	// 3. Check if we have a color (can't fire "Gray")
+	// 3. --- THIS CHECK IS NOW REMOVED ---
+	// The player can now fire "Grey" (EC_None) projectiles.
+	/*
 	if (ColorToFire == EColor::EC_None)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Fire Failed: No color equipped."));
-		// (Play "no ammo" sound)
-		return;
+	   UE_LOG(LogTemp, Warning, TEXT("Fire Failed: No color equipped."));
+	   // (Play "no ammo" sound)
+	   return;
 	}
+	*/
 
 	// 4. Check if we have a valid Projectile Class assigned
 	if (!ProjectileClass)
@@ -90,20 +93,19 @@ void AColorMageCharacter::OnFireProjectile()
 
 	// 7. Spawn the projectile
 	AColorProjectile* Projectile = GetWorld()->SpawnActor<AColorProjectile>(
-		ProjectileClass,
-		SpawnLocation,
-		SpawnRotation,
-		SpawnParams
+	   ProjectileClass,
+	   SpawnLocation,
+	   SpawnRotation,
+	   SpawnParams
 	);
 
 	if (Projectile)
 	{
-		// 8. Tell the projectile what color it is
+		// 8. Tell the projectile what color it is (will be EC_None if player is grey)
 		Projectile->SetProjectileColor(ColorToFire);
 		// (Play "Fire" animation montage)
 	}
 }
-
 // --- Dash Logic (Unchanged) ---
 void AColorMageCharacter::OnDash()
 {
