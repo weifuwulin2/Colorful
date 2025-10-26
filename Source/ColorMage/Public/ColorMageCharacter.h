@@ -17,6 +17,7 @@ GENERATED_BODY()
 
 public:
 	AColorMageCharacter();
+	virtual void Tick(float DeltaTime) override;
 
 protected:
 	// --- Input Assets ---
@@ -44,6 +45,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	FVector AimingCameraOffset = FVector(0.0f, 70.0f, 50.0f);
 
+	/** How fast the camera zooms in and out. Higher = faster. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
+	float ZoomInterpSpeed = 15.0f; 
+	
 	// --- Dash Config ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	TObjectPtr<UAnimMontage> DashMontage;
@@ -64,12 +69,13 @@ private:
 	float DefaultGravityScale;
 	FTimerHandle TimerHandle_DashFinished;
 
-	/** Timer to automatically exit Aim Mode after firing */
+	// ... (private variables)
 	FTimerHandle TimerHandle_AutoAimReset;
-
-	/** Tracks if the player is holding the Aim button */
-	bool bIsManuallyAiming = false; // <--- NEW STATE
-
+	bool bIsManuallyAiming = false;
+	
+	// --- [!! NEW: Target values for smooth zoom !!] ---
+	float TargetArmLength;
+	FVector TargetSocketOffset;
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -78,13 +84,17 @@ protected:
 	void OnDash();
 	void OnDashFinished();
 	void OnFireProjectile();
-	void OnAimStarted();
-	void OnAimCompleted();
+	void OnAimStarted();  // This is your RMB Press
+	void OnAimCompleted(); // This is your RMB Release
 
-	// --- NEW HELPER FUNCTIONS ---
-	/** Contains the logic to enter the aiming state */
-	void EnterAimState();
+	// --- [!! NEW REFACTORED FUNCTIONS !!] ---
+
+	/** HELPER: Toggles rotation lock (bUseControllerDesiredRotation) */
+	void SetAimRotation(bool bIsAiming);
 	
-	/** Contains the logic to exit the aiming state (with a safety check) */
-	void ExitAimState();
+	/** HELPER: Toggles camera zoom (TargetArmLength) */
+	void SetAimZoom(bool bIsZooming);
+
+	/** HELPER: Called by timer to reset rotation after hip-fire */
+	void ResetHipFireRotation();
 };

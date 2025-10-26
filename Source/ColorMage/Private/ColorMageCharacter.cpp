@@ -1,4 +1,3 @@
-// ColorMageCharacter.cpp
 #include "ColorMageCharacter.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -10,33 +9,75 @@
 
 AColorMageCharacter::AColorMageCharacter()
 {
+	// --- [!! MODIFIED !!] ---
+	// Enable Tick() so our smooth zoom will work
+	PrimaryActorTick.bCanEverTick = true; 
 	DefaultGravityScale = 1.0f;
 }
 
 void AColorMageCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		DefaultGravityScale = MoveComp->GravityScale;
 	}
 	
-	// --- [!! CORRECTED LOGIC !!] ---
-	// Find the SpringArm and SET its defaults from our variables
 	CameraSpringArm = FindComponentByClass<USpringArmComponent>();
 	if (CameraSpringArm)
 	{
+		// SET the component's values FROM our UPROPERTY defaults
 		CameraSpringArm->TargetArmLength = DefaultCameraDist;
 		CameraSpringArm->SocketOffset = DefaultCameraOffset;
+
+		// --- [!! NEW !!] ---
+		// Initialize the interpolation targets
+		TargetArmLength = DefaultCameraDist;
+		TargetSocketOffset = DefaultCameraOffset;
+
+		// --- [!! THIS IS THE FIX !!] ---
+		// Disable the SpringArm's built-in lag.
+		// This gives a crisp, responsive follow-camera.
+		CameraSpringArm->bEnableCameraLag = false;
+		CameraSpringArm->bEnableCameraRotationLag = false;
 	}
 }
+
+// --- [!! NEW FUNCTION !!] ---
+/** Called every frame */
+void AColorMageCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// --- Smooth Zoom Logic ---
+	if (CameraSpringArm)
+	{
+		// Smoothly interpolate the Arm Length
+		CameraSpringArm->TargetArmLength = FMath::FInterpTo(
+			CameraSpringArm->TargetArmLength, // Current
+			TargetArmLength,                  // Target
+			DeltaTime,
+			ZoomInterpSpeed
+		);
+
+		// Smoothly interpolate the Socket Offset
+		CameraSpringArm->SocketOffset = FMath::VInterpTo(
+			CameraSpringArm->SocketOffset,    // Current
+			TargetSocketOffset,               // Target
+			DeltaTime,
+			ZoomInterpSpeed
+		);
+	}
+}
+
 
 void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	if (UEnhancedInputComponent* EnhancedInputComp = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		// Bind Jump, Dash, Fire, Aim
+		// Bind all character-specific actions
 		if (JumpAction)
 		{
 			EnhancedInputComp->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
@@ -58,99 +99,100 @@ void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	}
 }
 
-// --- [!! REFACTORED !!] ---
+// --- Helper Functions for Aiming ---
+
+/** Toggles the character's rotation mode */
+void AColorMageCharacter::SetAimRotation(bool bIsAiming)
+{
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		if (bIsAiming)
+		{
+			MoveComp->bUseControllerDesiredRotation = true;
+			MoveComp->bOrientRotationToMovement = false;
+		}
+		else
+		{
+			MoveComp->bUseControllerDesiredRotation = false;
+			MoveComp->bOrientRotationToMovement = true;
+		}
+	}
+}
+
+// --- [!! MODIFIED !!] ---
+/** Toggles the camera's zoom level by setting the *target* for Tick() */
+void AColorMageCharacter::SetAimZoom(bool bIsZooming)
+{
+	// We no longer "snap" the camera. We just set the goal.
+	// The Tick() function will handle the smooth movement.
+	if (bIsZooming)
+	{
+		TargetArmLength = AimingCameraDist;
+		TargetSocketOffset = AimingCameraOffset;
+	}
+	else
+	{
+		TargetArmLength = DefaultCameraDist;
+		TargetSocketOffset = DefaultCameraOffset;
+	}
+}
+
+/** Called by the timer to turn off hip-fire rotation */
+void AColorMageCharacter::ResetHipFireRotation()
+{
+	if (!bIsManuallyAiming)
+	{
+		SetAimRotation(false);
+	}
+}
+
+// --- Aiming Input Handlers ---
+
 // Called when RMB is PRESSED
 void AColorMageCharacter::OnAimStarted()
 {
-	bIsManuallyAiming = true; // Mark as manual aim
-	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AutoAimReset); // Cancel any auto-exit timer
-	EnterAimState(); // Call the shared logic
+	bIsManuallyAiming = true;
+	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AutoAimReset);
+	SetAimRotation(true); // Lock Rotation
+	SetAimZoom(true);     // Set "Zoom In" target
 }
 
-// --- [!! REFACTORED !!] ---
 // Called when RMB is RELEASED
 void AColorMageCharacter::OnAimCompleted()
 {
-	bIsManuallyAiming = false; // No longer manually aiming
-	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AutoAimReset); // (Good practice)
-	ExitAimState(); // Call the shared logic
+	bIsManuallyAiming = false;
+	SetAimRotation(false); // Unlock Rotation
+	SetAimZoom(false);     // Set "Zoom Out" target
 }
 
-// --- [!! NEW HELPER FUNCTION !!] ---
-void AColorMageCharacter::EnterAimState()
-{
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-	{
-		MoveComp->bUseControllerDesiredRotation = true;
-		MoveComp->bOrientRotationToMovement = false;
-	}
-	if (CameraSpringArm)
-	{
-		// Pro-tip: You can use FMath::FInterpTo for a smooth zoom here
-		CameraSpringArm->TargetArmLength = AimingCameraDist;
-		CameraSpringArm->SocketOffset = AimingCameraOffset;
-	}
-}
 
-// --- [!! NEW HELPER FUNCTION with SAFETY CHECK !!] ---
-void AColorMageCharacter::ExitAimState()
-{
-	// This function can be called by RMB release OR the timer.
-    // If the timer fires, but we are now MANUALLY holding RMB,
-    // we must ignore the timer.
-	if (bIsManuallyAiming)
-	{
-		return; // We are holding RMB, so block the timer's request.
-	}
+// --- Fire Projectile Logic ---
 
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-	{
-		MoveComp->bUseControllerDesiredRotation = false;
-		MoveComp->bOrientRotationToMovement = true;
-	}
-	if (CameraSpringArm)
-	{
-		CameraSpringArm->TargetArmLength = DefaultCameraDist;
-		CameraSpringArm->SocketOffset = DefaultCameraOffset;
-	}
-}
-
-// --- [!! CORRECTED !!] ---
 // Called when LMB is PRESSED
 void AColorMageCharacter::OnFireProjectile()
 {
-	// Check if we are aiming manually OR if an auto-aim timer is already active
-	bool bIsAlreadyAiming = bIsManuallyAiming || GetWorld()->GetTimerManager().IsTimerActive(TimerHandle_AutoAimReset);
+	bool bIsAlreadyInAimRotation = bIsManuallyAiming || GetWorld()->GetTimerManager().IsTimerActive(TimerHandle_AutoAimReset);
 
-	// If we are not aiming in any way...
-	if (!bIsAlreadyAiming)
+	if (!bIsAlreadyInAimRotation)
 	{
-		// ...this is the first "hip fire" shot, so enter the aim state.
-		EnterAimState();
+		// This is a "hip-fire" shot. JUST lock the rotation.
+		SetAimRotation(true);
 	}
-	
-	// --- [!! THIS IS YOUR FIX !!] ---
-    // If we are NOT manually aiming...
-    if (!bIsManuallyAiming)
-    {
-        // ...then we are in an "auto-aim" state.
-        // Firing a shot should ALWAYS reset the "auto-exit" timer.
-        // Clear any old timer...
-        GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AutoAimReset); 
-        
-        // ...and set a new one.
-        GetWorld()->GetTimerManager().SetTimer(
+
+	if (!bIsManuallyAiming)
+	{
+		// Reset the "auto-exit" timer every time we hip-fire
+		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AutoAimReset); 
+		GetWorld()->GetTimerManager().SetTimer(
 			TimerHandle_AutoAimReset,
 			this,
-			&AColorMageCharacter::ExitAimState, // The timer just calls ExitAimState
-			1.5f,  // 1.5 seconds from THIS shot
+			&AColorMageCharacter::ResetHipFireRotation,
+			0.75f, 
 			false
 		);
-    }
-	// --- [!! END OF FIX !!] ---
+	}
 
-
-	// --- (Rest of your projectile code is identical) ---
+	// --- Projectile Spawning Code (Unchanged) ---
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
 	AColorMagePlayerState* PS = PC->GetPlayerState<AColorMagePlayerState>();
@@ -168,7 +210,10 @@ void AColorMageCharacter::OnFireProjectile()
 	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AColorProjectile* Projectile = GetWorld()->SpawnActor<AColorProjectile>(
-		ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams
+		ProjectileClass,
+		SpawnLocation,
+		SpawnRotation,
+		SpawnParams
 	);
 	if (Projectile)
 	{
@@ -176,40 +221,37 @@ void AColorMageCharacter::OnFireProjectile()
 	}
 }
 
-
 // --- Dash Logic (Unchanged) ---
 void AColorMageCharacter::OnDash()
 {
-    UCharacterMovementComponent* MoveComp = GetCharacterMovement();
-    if (!MoveComp || MoveComp->GravityScale != DefaultGravityScale) return;
-    
-    UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-    if (AnimInstance && DashMontage)
-    {
-       AnimInstance->Montage_Play(DashMontage);
-    }
-    
-    const float DashSpeed = DashDistance / DashDuration;
-    const FVector DashVelocity = GetActorForwardVector() * DashSpeed;
-
-    MoveComp->GravityScale = 0.0f;
-    LaunchCharacter(DashVelocity, true, true);
-
-    GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashFinished);
-    GetWorld()->GetTimerManager().SetTimer(
-       TimerHandle_DashFinished,
-       this,
-       &AColorMageCharacter::OnDashFinished,
-       DashDuration,
-       false
-    );
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp || MoveComp->GravityScale != DefaultGravityScale) return;
+	
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && DashMontage)
+	{
+		AnimInstance->Montage_Play(DashMontage);
+	}
+	
+	const float DashSpeed = DashDistance / DashDuration;
+	const FVector DashVelocity = GetActorForwardVector();
+	MoveComp->GravityScale = 0.0f;
+	LaunchCharacter(DashVelocity, true, true);
+	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashFinished);
+	GetWorld()->GetTimerManager().SetTimer(
+		TimerHandle_DashFinished,
+		this,
+		&AColorMageCharacter::OnDashFinished,
+		DashDuration,
+		false
+	);
 }
 
 void AColorMageCharacter::OnDashFinished()
 {
-    UCharacterMovementComponent* MoveComp = GetCharacterMovement();
-    if (!MoveComp) return;
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp) return;
 
-    MoveComp->GravityScale = DefaultGravityScale;
-    MoveComp->StopMovementImmediately();
+	MoveComp->GravityScale = DefaultGravityScale;
+	MoveComp->StopMovementImmediately();
 }
