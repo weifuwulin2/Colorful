@@ -9,8 +9,6 @@
 
 AColorMageCharacter::AColorMageCharacter()
 {
-	// --- [!! MODIFIED !!] ---
-	// Enable Tick() so our smooth zoom will work
 	PrimaryActorTick.bCanEverTick = true; 
 	DefaultGravityScale = 1.0f;
 }
@@ -31,42 +29,56 @@ void AColorMageCharacter::BeginPlay()
 		CameraSpringArm->TargetArmLength = DefaultCameraDist;
 		CameraSpringArm->SocketOffset = DefaultCameraOffset;
 
-		// --- [!! NEW !!] ---
 		// Initialize the interpolation targets
 		TargetArmLength = DefaultCameraDist;
 		TargetSocketOffset = DefaultCameraOffset;
 
-		// --- [!! THIS IS THE FIX !!] ---
-		// Disable the SpringArm's built-in lag.
-		// This gives a crisp, responsive follow-camera.
+		// Disable the SpringArm's built-in lag
 		CameraSpringArm->bEnableCameraLag = false;
 		CameraSpringArm->bEnableCameraRotationLag = false;
 	}
 }
 
-// --- [!! NEW FUNCTION !!] ---
-/** Called every frame */
 void AColorMageCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// --- Smooth Zoom Logic ---
+	// --- [!! NEW LERP LOGIC !!] ---
+	// If we are currently in the "hip-fire lerp" state...
+	if (bIsLerpingRotation)
+	{
+		// Smoothly interpolate the Actor's rotation
+		SetActorRotation(FMath::RInterpTo(
+			GetActorRotation(),
+			TargetRotation,
+			DeltaTime,
+			HipFireRotationSpeed
+		));
+
+		// Check if we've reached the target
+		if (GetActorRotation().Equals(TargetRotation, 1.0f))
+		{
+			// We're done. Stop lerping.
+			bIsLerpingRotation = false;
+
+			// Re-enable normal movement rotation
+			if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+			{
+				MoveComp->bOrientRotationToMovement = true;
+			}
+		}
+	}
+	// --- [!! END LERP LOGIC !!] ---
+
+
+	// --- Smooth Zoom Logic (Unchanged) ---
 	if (CameraSpringArm)
 	{
-		// Smoothly interpolate the Arm Length
 		CameraSpringArm->TargetArmLength = FMath::FInterpTo(
-			CameraSpringArm->TargetArmLength, // Current
-			TargetArmLength,                  // Target
-			DeltaTime,
-			ZoomInterpSpeed
+			CameraSpringArm->TargetArmLength, TargetArmLength, DeltaTime, ZoomInterpSpeed
 		);
-
-		// Smoothly interpolate the Socket Offset
 		CameraSpringArm->SocketOffset = FMath::VInterpTo(
-			CameraSpringArm->SocketOffset,    // Current
-			TargetSocketOffset,               // Target
-			DeltaTime,
-			ZoomInterpSpeed
+			CameraSpringArm->SocketOffset, TargetSocketOffset, DeltaTime, ZoomInterpSpeed
 		);
 	}
 }
@@ -77,7 +89,7 @@ void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	if (UEnhancedInputComponent* EnhancedInputComp = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		// Bind all character-specific actions
+		// ... (Bindings for Jump, Dash, Fire, Aim) ...
 		if (JumpAction)
 		{
 			EnhancedInputComp->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
@@ -99,102 +111,71 @@ void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	}
 }
 
-// --- Helper Functions for Aiming ---
+// --- Helper Functions for Aiming (Simplified) ---
 
-/** Toggles the character's rotation mode */
 void AColorMageCharacter::SetAimRotation(bool bIsAiming)
 {
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		if (bIsAiming)
-		{
-			MoveComp->bUseControllerDesiredRotation = true;
-			MoveComp->bOrientRotationToMovement = false;
-		}
-		else
-		{
-			MoveComp->bUseControllerDesiredRotation = false;
-			MoveComp->bOrientRotationToMovement = true;
-		}
+		MoveComp->bUseControllerDesiredRotation = bIsAiming;
+		MoveComp->bOrientRotationToMovement = !bIsAiming;
 	}
 }
 
-// --- [!! MODIFIED !!] ---
-/** Toggles the camera's zoom level by setting the *target* for Tick() */
 void AColorMageCharacter::SetAimZoom(bool bIsZooming)
 {
-	// We no longer "snap" the camera. We just set the goal.
-	// The Tick() function will handle the smooth movement.
-	if (bIsZooming)
-	{
-		TargetArmLength = AimingCameraDist;
-		TargetSocketOffset = AimingCameraOffset;
-	}
-	else
-	{
-		TargetArmLength = DefaultCameraDist;
-		TargetSocketOffset = DefaultCameraOffset;
-	}
+	TargetArmLength = bIsZooming ? AimingCameraDist : DefaultCameraDist;
+	TargetSocketOffset = bIsZooming ? AimingCameraOffset : DefaultCameraOffset;
 }
 
-/** Called by the timer to turn off hip-fire rotation */
-void AColorMageCharacter::ResetHipFireRotation()
-{
-	if (!bIsManuallyAiming)
-	{
-		SetAimRotation(false);
-	}
-}
+// [!! REMOVED !!] - ResetHipFireRotation is gone.
 
 // --- Aiming Input Handlers ---
 
-// Called when RMB is PRESSED
 void AColorMageCharacter::OnAimStarted()
 {
 	bIsManuallyAiming = true;
-	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AutoAimReset);
-	SetAimRotation(true); // Lock Rotation
-	SetAimZoom(true);     // Set "Zoom In" target
+	bIsLerpingRotation = false; // Stop any hip-fire lerp, manual aim takes priority
+	SetAimRotation(true); 
+	SetAimZoom(true);
 }
 
-// Called when RMB is RELEASED
 void AColorMageCharacter::OnAimCompleted()
 {
 	bIsManuallyAiming = false;
-	SetAimRotation(false); // Unlock Rotation
-	SetAimZoom(false);     // Set "Zoom Out" target
+	SetAimRotation(false);
+	SetAimZoom(false);
 }
 
 
 // --- Fire Projectile Logic ---
 
-// Called when LMB is PRESSED
+// --- [!! THIS IS YOUR SOLUTION !!] ---
 void AColorMageCharacter::OnFireProjectile()
 {
-	bool bIsAlreadyInAimRotation = bIsManuallyAiming || GetWorld()->GetTimerManager().IsTimerActive(TimerHandle_AutoAimReset);
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC) return;
 
-	if (!bIsAlreadyInAimRotation)
-	{
-		// This is a "hip-fire" shot. JUST lock the rotation.
-		SetAimRotation(true);
-	}
-
+	// If we are NOT manually aiming...
 	if (!bIsManuallyAiming)
 	{
-		// Reset the "auto-exit" timer every time we hip-fire
-		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AutoAimReset); 
-		GetWorld()->GetTimerManager().SetTimer(
-			TimerHandle_AutoAimReset,
-			this,
-			&AColorMageCharacter::ResetHipFireRotation,
-			0.75f, 
-			false
-		);
+		// ...this is a hip-fire.
+		// 1. Temporarily disable movement rotation (so it doesn't fight our lerp)
+		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+		{
+			MoveComp->bOrientRotationToMovement = false;
+		}
+
+		// 2. Set the target for our lerp
+		TargetRotation = PC->GetControlRotation();
+		TargetRotation.Pitch = 0; // Don't make the character lean
+		TargetRotation.Roll = 0;
+		
+		// 3. Start the lerp (Tick() will take over from here)
+		bIsLerpingRotation = true;
 	}
 
 	// --- Projectile Spawning Code (Unchanged) ---
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC) return;
 	AColorMagePlayerState* PS = PC->GetPlayerState<AColorMagePlayerState>();
 	if (!PS) return;
 	EColor ColorToFire = PS->GetCurrentColor();
@@ -210,10 +191,7 @@ void AColorMageCharacter::OnFireProjectile()
 	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AColorProjectile* Projectile = GetWorld()->SpawnActor<AColorProjectile>(
-		ProjectileClass,
-		SpawnLocation,
-		SpawnRotation,
-		SpawnParams
+		ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams
 	);
 	if (Projectile)
 	{
@@ -224,15 +202,14 @@ void AColorMageCharacter::OnFireProjectile()
 // --- Dash Logic (Unchanged) ---
 void AColorMageCharacter::OnDash()
 {
+    // ... (Your existing OnDash code)
 	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
 	if (!MoveComp || MoveComp->GravityScale != DefaultGravityScale) return;
-	
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && DashMontage)
 	{
 		AnimInstance->Montage_Play(DashMontage);
 	}
-	
 	const float DashSpeed = DashDistance / DashDuration;
 	const FVector DashVelocity = GetActorForwardVector();
 	MoveComp->GravityScale = 0.0f;
@@ -249,9 +226,9 @@ void AColorMageCharacter::OnDash()
 
 void AColorMageCharacter::OnDashFinished()
 {
+    // ... (Your existing OnDashFinished code)
 	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
 	if (!MoveComp) return;
-
 	MoveComp->GravityScale = DefaultGravityScale;
 	MoveComp->StopMovementImmediately();
 }
