@@ -43,7 +43,14 @@ protected:
 	FVector AimingCameraOffset = FVector(0.0f, 70.0f, 50.0f);
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	float ZoomInterpSpeed = 15.0f;
+	/** "Hip-Fire" (非瞄准) 时的“向前”偏移值 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+	float HipFireForwardOffset = 730.0f; // <-- 偏移多一些
 
+	/** "Aiming" (瞄准) 时的“向前”偏移值 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+	float AimingForwardOffset = 400.0f;
+	
 	/** How fast the character 'lerps' to the hip-fire direction */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
 	float HipFireRotationSpeed = 10.0f; // <--- [!! NEW !!]

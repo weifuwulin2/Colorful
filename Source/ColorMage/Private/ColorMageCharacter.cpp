@@ -148,34 +148,51 @@ void AColorMageCharacter::OnAimCompleted()
 }
 
 
-// --- Fire Projectile Logic ---
+// 在 ColorMageCharacter.cpp 文件的顶部，确保你有这一行：
+#include "Kismet/KismetSystemLibrary.h"
 
-// --- [!! THIS IS YOUR SOLUTION !!] ---
+// --- [!! 完整的、已修复的 OnFireProjectile - 动态向前偏移 !!] ---
 void AColorMageCharacter::OnFireProjectile()
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
 
-	// If we are NOT manually aiming...
+	// --- (你现有的 "hip-fire" 旋转逻辑 - 这部分保持不变) ---
 	if (!bIsManuallyAiming)
 	{
-		// ...this is a hip-fire.
-		// 1. Temporarily disable movement rotation (so it doesn't fight our lerp)
 		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 		{
 			MoveComp->bOrientRotationToMovement = false;
 		}
-
-		// 2. Set the target for our lerp
 		TargetRotation = PC->GetControlRotation();
-		TargetRotation.Pitch = 0; // Don't make the character lean
+		TargetRotation.Pitch = 0; 
 		TargetRotation.Roll = 0;
-		
-		// 3. Start the lerp (Tick() will take over from here)
 		bIsLerpingRotation = true;
 	}
 
-	// --- Projectile Spawning Code (Unchanged) ---
+	// --- [!! START: 按照你的要求修复 - 动态向前偏移 !!] ---
+
+	// 1. 获取摄像机（屏幕中心）的视角
+	FVector CameraLocation;
+	FRotator CameraRotation;
+	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+
+	// 2. 发射方向就是摄像机（屏幕中心）的方向
+	FRotator SpawnRotation = CameraRotation;
+
+	// 3. 获取摄像机“前方”的向量
+	const FVector CameraForward = CameraRotation.Vector(); 
+
+	// 4. [!! 关键 !!] 根据瞄准状态选择正确的“向前”偏移值
+	const float FinalForwardOffset = bIsManuallyAiming ? AimingForwardOffset : HipFireForwardOffset;
+
+	// 5. 计算最终的发射点：摄像机位置 + 你指定的向前偏移
+	FVector SpawnLocation = CameraLocation + (CameraForward * FinalForwardOffset);
+
+	// --- [!! END: 你的方案 !!] ---
+
+
+	// --- (你现有的投射物生成代码) ---
 	AColorMagePlayerState* PS = PC->GetPlayerState<AColorMagePlayerState>();
 	if (!PS) return;
 	EColor ColorToFire = PS->GetCurrentColor();
@@ -184,21 +201,25 @@ void AColorMageCharacter::OnFireProjectile()
 		UE_LOG(LogTemp, Error, TEXT("Fire Failed: ProjectileClass is not set in BP_ColorMageCharacter."));
 		return;
 	}
-	FVector SpawnLocation = GetMesh()->GetSocketLocation(ProjectileSpawnSocketName);
-	FRotator SpawnRotation = PC->GetControlRotation(); 
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
 	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	// 修复了崩溃: 我们生成一个 AColorProjectile
 	AColorProjectile* Projectile = GetWorld()->SpawnActor<AColorProjectile>(
-		ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams
+		ProjectileClass,
+		SpawnLocation,
+		SpawnRotation,
+		SpawnParams
 	);
+
 	if (Projectile)
 	{
 		Projectile->SetProjectileColor(ColorToFire);
 	}
 }
-
 // --- Dash Logic (Unchanged) ---
 void AColorMageCharacter::OnDash()
 {
