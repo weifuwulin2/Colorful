@@ -7,37 +7,33 @@
 #include "GameFramework/Actor.h"
 #include "ColorProjectile.generated.h"
 
+class UColorComponent;
 class USphereComponent;
 class UProjectileMovementComponent;
 UCLASS()
 class COLORMAGE_API AColorProjectile : public AActor
 {
 	GENERATED_BODY()
-	
 public:	
 	AColorProjectile();
-
-	/** Sets the color of this projectile (called by the character who fires it). */
+	void BeginPlay();
 	void SetProjectileColor(EColor NewColor);
+	EColor GetProjectileColor() const;
 
 protected:
-	/** The collision sphere. */
+	// ... (CollisionComponent, ProjectileMovementComponent) ...
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> CollisionComponent;
-
-	/** The component that makes the projectile move. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UProjectileMovementComponent> ProjectileMovementComponent;
 
-	/** The color this projectile will apply on impact. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Color Magic")
-	EColor ProjectileColor = EColor::EC_None;
-
-	/** Called when the projectile hits something. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UColorComponent> ColorComponent;
+	
+	/** * [!! 已修改 !!]
+	 * 当投射物开始与其他组件重叠时调用。
+	 * 函数签名已更改以匹配 OnComponentBeginOverlap。
+	 */
 	UFUNCTION()
-	void OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
-
-	/** Blueprint event for visual effects (e.g., changing particle color). */
-	UFUNCTION(BlueprintImplementableEvent, Category = "Color Magic")
-	void OnColorSet(EColor NewColor);
+	void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };
