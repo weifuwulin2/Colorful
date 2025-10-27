@@ -1,4 +1,6 @@
 #include "ColorMageCharacter.h"
+
+#include "ColorMageGameMode.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -6,6 +8,7 @@
 #include "ColorProjectile.h"
 #include "EnhancedInputComponent.h"
 #include "Animation/AnimInstance.h"
+#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h" // 包含射线检测
 
 AColorMageCharacter::AColorMageCharacter()
@@ -99,6 +102,41 @@ void AColorMageCharacter::SetAimZoom(bool bIsZooming)
 	TargetSocketOffset = bIsZooming ? AimingCameraOffset : DefaultCameraOffset;
 }
 
+void AColorMageCharacter::FellOutOfWorld(const UDamageType& dmgType)
+{
+	UE_LOG(LogTemp, Warning, TEXT("ColorMageCharacter %s 掉出世界!"), *GetName());
+
+	// 获取 GameMode
+	AGameModeBase* CurrentGameModeBase = UGameplayStatics::GetGameMode(this);
+	AColorMageGameMode* MyGameMode = Cast<AColorMageGameMode>(CurrentGameModeBase);
+
+	if (MyGameMode)
+	{
+		// 获取控制这个角色的 Controller
+		AController* MyController = GetController();
+		if (MyController)
+		{
+			// 调用 GameMode 的重生函数
+			MyGameMode->RespawnPlayer(MyController);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("FellOutOfWorld: 无法获取 Controller 来重生!"));
+			// 备用方案：直接销毁？
+			// Destroy();
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("FellOutOfWorld: 无法获取 MyGameMode!"));
+		// 备用方案：调用基类实现（通常是销毁 Actor）
+		Super::FellOutOfWorld(dmgType);
+	}
+	
+	// 注意：我们通常不调用 Super::FellOutOfWorld(dmgType);
+	// 因为基类的默认实现是销毁 Actor，而我们想要重生。
+}
+
 // --- Input Handlers ---
 void AColorMageCharacter::OnAimStarted()
 {
@@ -144,15 +182,75 @@ void AColorMageCharacter::OnFireProjectile()
 }
 void AColorMageCharacter::OnDash()
 {
-	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
-	if (!MoveComp || MoveComp->GravityScale != DefaultGravityScale) return;
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (AnimInstance && DashMontage) { AnimInstance->Montage_Play(DashMontage); }
-	const float DashSpeed = DashDistance / DashDuration;
-	const FVector DashVelocity = GetActorForwardVector();
-	MoveComp->GravityScale = 0.0f; LaunchCharacter(DashVelocity, true, true);
-	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashFinished);
-	GetWorld()->GetTimerManager().SetTimer(TimerHandle_DashFinished, this, &AColorMageCharacter::OnDashFinished, DashDuration, false);
+    // --- [!! Debug Logs Added !!] ---
+    UE_LOG(LogTemp, Warning, TEXT("OnDash() - Function Called!"));
+
+    UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+    if (!MoveComp)
+    {
+        UE_LOG(LogTemp, Error, TEXT("OnDash() - FAILED: CharacterMovementComponent not found!"));
+        return;
+    }
+
+    // Check if already dashing (using gravity scale)
+    if (MoveComp->GravityScale != DefaultGravityScale)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("OnDash() - FAILED: Already dashing? GravityScale (%f) != Default (%f)"), MoveComp->GravityScale, DefaultGravityScale);
+        return;
+    }
+
+    // Check Animation Montage (Optional check)
+    UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+    if (!AnimInstance || !DashMontage)
+    {
+         UE_LOG(LogTemp, Warning, TEXT("OnDash() - WARNING: AnimInstance or DashMontage not found, but attempting dash anyway."));
+         // If you require the montage to dash, uncomment the next line:
+         // return;
+    }
+    else
+    {
+    	AnimInstance->Montage_Play(DashMontage);
+        UE_LOG(LogTemp, Log, TEXT("OnDash() - Playing DashMontage."));
+    }
+
+    // Check Dash Distance and Duration values
+    if (DashDistance <= 0.f || DashDuration <= 0.f)
+    {
+        UE_LOG(LogTemp, Error, TEXT("OnDash() - FAILED: Invalid DashDistance (%f) or DashDuration (%f)! Must be > 0."), DashDistance, DashDuration);
+        return;
+    }
+
+    // --- Calculate Dash Velocity ---
+    const float DashSpeed = DashDistance / DashDuration;
+    const FVector ForwardDir = GetActorForwardVector(); // Get the direction the character mesh is facing
+    const FVector DashVelocity = ForwardDir * DashSpeed;
+
+    UE_LOG(LogTemp, Log, TEXT("OnDash() - Calculated Values: Speed=%.2f, ForwardDir=%s, DashVelocity=%s"), DashSpeed, *ForwardDir.ToString(), *DashVelocity.ToString());
+
+    // --- Execute Dash ---
+    // Temporarily set gravity to 0 for horizontal flight
+    MoveComp->GravityScale = 0.0f;
+
+    // Launch the character
+    // bXYOverride = true: Force overrides current horizontal velocity.
+    // bZOverride = true: Force overrides current vertical velocity (using DashVelocity.Z, which is 0 here).
+    LaunchCharacter(DashVelocity, true, true);
+    UE_LOG(LogTemp, Log, TEXT("OnDash() - LaunchCharacter called with Velocity=%s. GravityScale set to 0.0."), *DashVelocity.ToString());
+
+    // --- Set Timer to Finish Dash ---
+    // Clear any previous timer
+    GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashFinished);
+
+    // Set a new timer to call OnDashFinished after DashDuration
+    GetWorld()->GetTimerManager().SetTimer(
+       TimerHandle_DashFinished,          // Timer handle
+       this,                              // Object to call function on
+       &AColorMageCharacter::OnDashFinished, // Function to call
+       DashDuration,                      // Delay
+       false                              // Don't loop
+    );
+     UE_LOG(LogTemp, Log, TEXT("OnDash() - OnDashFinished timer set for %.2f seconds."), DashDuration);
+     // --- [!! End of Debug Logs !!] ---
 }
 void AColorMageCharacter::OnDashFinished()
 {

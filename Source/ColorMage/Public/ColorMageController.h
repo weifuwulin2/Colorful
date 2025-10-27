@@ -28,6 +28,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Possession")
 	void RequestRepossessOriginalCharacter();
 
+	UPROPERTY()
+	TWeakObjectPtr<AColorMageCharacter> HiddenCharacter = nullptr;
 protected:
 	// --- Input 资产 ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
@@ -55,10 +57,6 @@ protected:
 	void HandleLook(const FInputActionValue& Value);
 
 private:
-	/** 存储我们隐藏的原始角色的引用 (使用弱指针防止循环引用) */
-	UPROPERTY()
-	TWeakObjectPtr<AColorMageCharacter> HiddenCharacter = nullptr;
-
 	// 声明 UColorManagerSubsystem 为友元类，允许它访问私有成员 HiddenCharacter
 	friend class UColorManagerSubsystem;
 };

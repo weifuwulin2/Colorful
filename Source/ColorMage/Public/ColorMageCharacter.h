@@ -49,7 +49,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	TObjectPtr<UAnimMontage> DashMontage;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
-	float DashDistance = 1000.0f;
+	float DashDistance = 500.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	float DashDuration = 0.25f;
 	
@@ -96,4 +96,6 @@ protected:
 	// --- Helper Functions ---
 	void SetAimRotation(bool bIsAiming);
 	void SetAimZoom(bool bIsZooming);
+
+	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
 };
