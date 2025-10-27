@@ -30,7 +30,7 @@ void AColorMageController::OnPossess(APawn* InPawn)
 	if (PlayerCameraManager)
 	{
 		PlayerCameraManager->ViewPitchMin = -70.0f;
-		PlayerCameraManager->ViewPitchMax = 80.0f;
+		PlayerCameraManager->ViewPitchMax = 20.0f;
 	}
 	
 	// 设置输入模式并隐藏鼠标
