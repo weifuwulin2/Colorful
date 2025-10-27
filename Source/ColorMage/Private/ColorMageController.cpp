@@ -114,40 +114,66 @@ void AColorMageController::HandleMove(const FInputActionValue& Value)
 	}
 }
 
-// Interaction logic (RMB)
+// Interaction logic (RMB/E)
 void AColorMageController::OnInteract()
 {
-	// 1. Perform Line Trace
+	// 1. Get Camera Location, etc.
 	FVector CameraLocation;
 	FRotator CameraRotation;
 	GetPlayerViewPoint(CameraLocation, CameraRotation);
-
 	FVector TraceStart = CameraLocation;
 	FVector TraceEnd = TraceStart + (CameraRotation.Vector() * InteractionDistance);
 
+	// --- [!! THIS IS THE FIX !!] ---
+    
+	// 2. Setup the C++ style Collision Parameters
+	FCollisionQueryParams QueryParams;
+	if (APawn* MyPawn = GetPawn())
+	{
+		QueryParams.AddIgnoredActor(MyPawn); // Ignore the player
+	}
+    
 	FHitResult HitResult;
-	bool bHit = UKismetSystemLibrary::LineTraceSingle(
-		this,
+
+	// 3. Use the GetWorld() function, which takes an ECollisionChannel
+	bool bHit = GetWorld()->LineTraceSingleByChannel(
+		HitResult,
 		TraceStart,
 		TraceEnd,
-		ETraceTypeQuery::TraceTypeQuery1, // Visibility channel
-		false,
-		TArray<AActor*>(),
-		EDrawDebugTrace::None, // Change to ForDuration to debug
-		HitResult,
-		true
+		ECollisionChannel::ECC_Visibility, // <--- This function DOES take this
+		QueryParams
 	);
-	
+	// --- [!! END OF FIX !!] ---
+
+
+	// --- [!! DEBUGGING !!] ---
+	// If you still want the debug line, you have to draw it manually
+	DrawDebugLine(
+		GetWorld(),
+		TraceStart,
+		bHit ? HitResult.Location : TraceEnd,
+		bHit ? FColor::Green : FColor::Red,
+		false,
+		5.0f,
+		0,
+		1.0f
+	);
+	// --- [!! END DEBUGGING !!] ---
+
+
 	if (bHit && HitResult.GetActor())
 	{
-		// 2. Get the Color Manager Subsystem
+		UE_LOG(LogTemp, Warning, TEXT("射线击中了: %s"), *HitResult.GetActor()->GetName());
+       
 		UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
-
 		if (ColorManager)
 		{
-			// 3. "Outsource" the logic to the subsystem
 			ColorManager->HandlePlayerInteraction(this, HitResult.GetActor());
 		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("射线什么也没击中。"));
 	}
 }
 
