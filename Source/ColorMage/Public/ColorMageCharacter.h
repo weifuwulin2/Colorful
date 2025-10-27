@@ -22,7 +22,6 @@ public:
 
 protected:
 	// --- Input Assets ---
-	// ... (JumpAction, DashAction, FireProjectileAction, AimAction) ...
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> JumpAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
@@ -43,30 +42,22 @@ protected:
 	FVector AimingCameraOffset = FVector(0.0f, 70.0f, 50.0f);
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	float ZoomInterpSpeed = 15.0f;
-	/** "Hip-Fire" (非瞄准) 时的“向前”偏移值 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
-	float HipFireForwardOffset = 730.0f; // <-- 偏移多一些
+	float HipFireRotationSpeed = 10.0f;
 
-	/** "Aiming" (瞄准) 时的“向前”偏移值 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
-	float AimingForwardOffset = 400.0f;
-	
-	/** How fast the character 'lerps' to the hip-fire direction */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
-	float HipFireRotationSpeed = 10.0f; // <--- [!! NEW !!]
-
-	// ... (Dash and Projectile Config) ...
+	// --- Dash Config ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	TObjectPtr<UAnimMontage> DashMontage;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	float DashDistance = 1000.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	float DashDuration = 0.25f;
+	
+	// --- Projectile Config ---
 	UPROPERTY(EditDefaultsOnly, Category = "Combat")
 	TSubclassOf<AColorProjectile> ProjectileClass;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 	FName ProjectileSpawnSocketName = "BrushTip";
-
 
 private:
 	// --- Cached Components & Timers ---
@@ -74,16 +65,14 @@ private:
 	float DefaultGravityScale;
 	FTimerHandle TimerHandle_DashFinished;
 
-	// [!! REMOVED !!] - TimerHandle_AutoAimReset is gone.
-
 	/** Tracks if the player is holding the Aim button */
 	bool bIsManuallyAiming = false;
 	
 	/** Tracks if we are currently lerping our rotation from a hip-fire */
-	bool bIsLerpingRotation = false; // <--- [!! NEW !!]
+	bool bIsLerpingRotation = false; 
 	
 	/** The rotation we are trying to lerp to */
-	FRotator TargetRotation; // <--- [!! NEW !!]
+	FRotator TargetRotation;
 
 	// --- Target values for smooth zoom ---
 	float TargetArmLength;
@@ -94,6 +83,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	/** 当这个角色被控制器附身时调用 (用于取消隐藏) */
+	virtual void PossessedBy(AController* NewController) override;
+
 	// --- Input Handlers ---
 	void OnDash();
 	void OnDashFinished();
@@ -102,11 +94,6 @@ protected:
 	void OnAimCompleted();
 
 	// --- Helper Functions ---
-	/** HELPER: Toggles rotation lock (bUseControllerDesiredRotation) */
 	void SetAimRotation(bool bIsAiming);
-	
-	/** HELPER: Toggles camera zoom (TargetArmLength) */
 	void SetAimZoom(bool bIsZooming);
-
-	// [!! REMOVED !!] - ResetHipFireRotation is gone.
 };

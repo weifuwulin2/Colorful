@@ -8,6 +8,7 @@
 #include "InputMappingContext.h"
 #include "ColorMageController.generated.h"
 
+class AColorMageCharacter;
 /**
  * 
  */
@@ -19,45 +20,45 @@ class COLORMAGE_API AColorMageController : public APlayerController
 public:
 	AColorMageController();
 
-	// --- Enhanced Input 资产引用 ---
-	
-	/** 我们的默认输入映射上下文 (在蓝图中指定) */
+	/** 远程交互/附身的最大距离 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
+	float InteractionDistance = 10000.0f;
+
+	/** 请求控制器重新附身之前隐藏的角色 */
+	UFUNCTION(BlueprintCallable, Category = "Possession")
+	void RequestRepossessOriginalCharacter();
+
+protected:
+	// --- Input 资产 ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultInputMappingContext;
 
-	/** "移动" 输入动作 (在蓝图中指定) */
+	/** 移动 (WASD) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> MoveAction;
 	
-	/** Interact Action (RMB). */
+	/** 远程交互/附身 (E 键) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> InteractAction;
 
-	/** 摄像机观看 (鼠标移动) <-- [!! 新增 !!] */
+	/** 摄像机观看 (鼠标移动) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> LookAction;
-	
-	/** Max distance for the RMB interaction line trace. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
-	float InteractionDistance = 10000.0f;
-	
+
 protected:
-	/** 当控制器附身到一个Pawn时调用 */
 	virtual void OnPossess(APawn* InPawn) override;
-
-	/** 设置输入组件 */
 	virtual void SetupInputComponent() override;
-	
+
 	// --- 输入处理函数 ---
-
-	/**
-	 * 绑定的 "MoveAction" (IA_Move) 的触发函数
-	 * @param Value IA_Move 传递过来的值 (在我们的例子里是一个 FVector2D)
-	 */
 	void HandleMove(const FInputActionValue& Value);
-
-	/** Called to handle RMB interaction. */
 	void OnInteract();
-	/** 处理鼠标观看的函数 <-- [!! 新增 !!] */
 	void HandleLook(const FInputActionValue& Value);
+
+private:
+	/** 存储我们隐藏的原始角色的引用 (使用弱指针防止循环引用) */
+	UPROPERTY()
+	TWeakObjectPtr<AColorMageCharacter> HiddenCharacter = nullptr;
+
+	// 声明 UColorManagerSubsystem 为友元类，允许它访问私有成员 HiddenCharacter
+	friend class UColorManagerSubsystem;
 };
