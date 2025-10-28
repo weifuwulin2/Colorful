@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "InputAction.h"
+#include "PawnControlType.h"
 #include "GameFramework/Character.h"
 #include "ColorMageCharacter.generated.h"
 
@@ -20,6 +21,9 @@ public:
 	AColorMageCharacter();
 	virtual void Tick(float DeltaTime) override;
 
+	UFUNCTION(BlueprintPure, Category = "UI") // BlueprintPure makes it easily accessible
+	EPawnControlType GetControlType() const { return ControlType; }
+	
 protected:
 	// --- Input Assets ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
@@ -58,7 +62,7 @@ protected:
 	TSubclassOf<AColorProjectile> ProjectileClass;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 	FName ProjectileSpawnSocketName = "BrushTip";
-
+	
 private:
 	// --- Cached Components & Timers ---
 	TObjectPtr<USpringArmComponent> CameraSpringArm;
@@ -85,6 +89,9 @@ protected:
 
 	/** 当这个角色被控制器附身时调用 (用于取消隐藏) */
 	virtual void PossessedBy(AController* NewController) override;
+
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "UI") // VisibleDefaultsOnly is appropriate here
+	EPawnControlType ControlType = EPawnControlType::Character;
 
 	// --- Input Handlers ---
 	void OnDash();

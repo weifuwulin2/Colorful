@@ -30,6 +30,6 @@ void AColorMagePlayerState::Server_SetCurrentColor_Implementation(EColor NewColo
 void AColorMagePlayerState::OnRep_CurrentColor()
 {
 	// You can broadcast an event here for UI widgets to update
-	// OnColorChanged.Broadcast(CurrentColor);
+	OnPlayerColorChanged.Broadcast(CurrentColor);
 	UE_LOG(LogTemp, Warning, TEXT("PlayerState Color updated to: %d"), (int32)CurrentColor);
 }

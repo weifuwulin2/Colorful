@@ -16,6 +16,7 @@ APlatformPawn::APlatformPawn()
 	// 或者，如果你确定所有平台都用水平移动：
 	// #include "HorizontalMovementComponent.h" // 需要包含头文件
 	// PlatformMovementComponent = CreateDefaultSubobject<UHorizontalMovementComponent>(TEXT("HorizontalMovement"));
+	ControlType = EPawnControlType::Platform;
 }
 
 void APlatformPawn::BeginPlay()

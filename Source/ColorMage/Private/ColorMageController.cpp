@@ -35,9 +35,42 @@ void AColorMageController::OnPossess(APawn* InPawn)
 	
 	// 设置输入模式并隐藏鼠标
 	bShowMouseCursor = false;
+
+	
+	
 	FInputModeGameOnly InputMode;
 	InputMode.SetConsumeCaptureMouseDown(true); 
 	SetInputMode(InputMode);
+
+	EPawnControlType PossessedType = EPawnControlType::Unknown;
+	if (InPawn) // Check if the possessed pawn is valid
+		{
+		// Try casting to Character first
+		AColorMageCharacter* ColorMageCharacter = Cast<AColorMageCharacter>(InPawn);
+		if (ColorMageCharacter)
+		{
+			PossessedType = ColorMageCharacter->GetControlType(); // Should be Character
+		}
+		else
+		{
+			// If not character, try casting to the Possessable base
+			APossessablePawn* PossPawn = Cast<APossessablePawn>(InPawn);
+			if (PossPawn)
+			{
+				PossessedType = PossPawn->GetControlType(); // Get type from PossessablePawn or its children
+			}
+			// Add more specific casts here if needed (e.g., if some pawns don't inherit APossessablePawn but still need hints)
+		}
+		}
+	else // Possessing nothing (e.g., after UnPossess before possessing character)
+		{
+		// We could maybe infer Character here if HiddenCharacter is valid, but Unknown is safer
+		PossessedType = EPawnControlType::Unknown;
+		}
+
+
+	// Broadcast the determined type
+	OnPawnControlChanged.Broadcast(PossessedType);
 }
 
 void AColorMageController::SetupInputComponent()

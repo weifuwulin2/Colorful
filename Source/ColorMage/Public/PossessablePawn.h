@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "ColorTypes.h"
 #include "InputAction.h"
+#include "PawnControlType.h"
 #include "GameFramework/Pawn.h"
 #include "PossessablePawn.generated.h"
 
@@ -28,6 +29,9 @@ public:
 	/** 获取角色解除附身后应该出现的世界变换（位置和旋转） */
 	UFUNCTION(BlueprintCallable, Category = "Possession")
 	FTransform GetCharacterExitTransform() const;
+
+	UFUNCTION(BlueprintPure, Category = "UI")
+	EPawnControlType GetControlType() const { return ControlType; }
 
 protected:
 	/** 用于视觉表现的基础网格体 */
@@ -53,4 +57,7 @@ protected:
 	void OnUnpossess();
 	
 	bool bCanBePossessed;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI") // EditDefaultsOnly allows setting in child C++ constructors/BPs
+	EPawnControlType ControlType = EPawnControlType::Unknown; // Base class is Unknown
 };

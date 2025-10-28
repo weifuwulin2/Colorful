@@ -10,6 +10,7 @@
 /**
  * 
  */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerColorChanged, EColor, NewColor);
 UCLASS()
 class COLORMAGE_API AColorMagePlayerState : public APlayerState
 {
@@ -28,6 +29,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Color Magic")
 	EColor GetCurrentColor() const { return CurrentColor; }
 
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnPlayerColorChanged OnPlayerColorChanged;
+	
 protected:
 	/** Replication notification function for when CurrentColor changes. */
 	UFUNCTION()

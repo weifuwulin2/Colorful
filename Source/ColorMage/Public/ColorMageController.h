@@ -12,6 +12,7 @@ class AColorMageCharacter;
 /**
  * 
  */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPawnControlChanged, EPawnControlType, NewPawnType);
 UCLASS()
 class COLORMAGE_API AColorMageController : public APlayerController
 {
@@ -30,6 +31,10 @@ public:
 
 	UPROPERTY()
 	TWeakObjectPtr<AColorMageCharacter> HiddenCharacter = nullptr;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FPawnControlChanged OnPawnControlChanged;
+	
 protected:
 	// --- Input 资产 ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
@@ -47,7 +52,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> LookAction;
 
-protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
 
