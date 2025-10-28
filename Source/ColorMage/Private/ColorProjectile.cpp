@@ -91,52 +91,64 @@ void AColorProjectile::BeginPlay()
 // --- [!! 已修改 !!] ---
 void AColorProjectile::SetProjectileColor(EColor NewColor)
 {
-	ColorComponent->SetColor(NewColor);
+	if (ColorComponent) { ColorComponent->SetColor(NewColor); }
 }
 
 // --- [!! 新增 !!] ---
 EColor AColorProjectile::GetProjectileColor() const
 {
-	return ColorComponent->GetColor();
+	return ColorComponent ? ColorComponent->GetColor() : EColor::EC_None;
 }
 
 void AColorProjectile::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	// --- [!! 调试 !!] ---
-	if (OtherActor) { UE_LOG(LogTemp, Warning, TEXT("[Projectile]: OnOverlapBegin 重叠了: %s"), *OtherActor->GetName()); }
-	else { UE_LOG(LogTemp, Error, TEXT("[Projectile]: OnOverlapBegin 重叠了一个无效 Actor!")); Destroy(); return; }
-	// --- [!! 调试结束 !!] ---
+	// Basic checks
+	if (!OtherActor || OtherActor == this) return;
+    UE_LOG(LogTemp, Warning, TEXT("[Projectile]: Overlap with: %s"), *OtherActor->GetName());
 
-	// 1. 检查我们是否重叠了有效的Actor (并且不是我们自己)
-	if (OtherActor && OtherActor != this)
-	{
-		// 2. 检查重叠的 Actor 是否是一个 "APossessablePawn"
-		APossessablePawn* PossessablePawn = Cast<APossessablePawn>(OtherActor);
+    // Attempt to get the target's ColorComponent
+    UColorComponent* TargetColorComp = OtherActor->FindComponentByClass<UColorComponent>();
 
-		if (PossessablePawn)
-		{
-			UE_LOG(LogTemp, Log, TEXT("[Projectile]: 成功! 重叠的是 APossessablePawn。正在尝试获取 ColorComponent..."));
-            
-			UColorComponent* TargetColorComp = PossessablePawn->FindComponentByClass<UColorComponent>();
-			if (TargetColorComp)
-			{
-				UE_LOG(LogTemp, Log, TEXT("[Projectile]: 成功! 找到了 ColorComponent。正在调用 SetColor(%d)..."), (int32)GetProjectileColor());
-				TargetColorComp->SetColor(GetProjectileColor());
+    // Does the target have a ColorComponent?
+    if (TargetColorComp)
+    {
+        EColor TargetCurrentColor = TargetColorComp->GetColor();
+        EColor ProjColor = GetProjectileColor();
 
-				// [!! 重要 !!] 既然我们上色成功了，就应该销毁投射物
-				// 否则它会继续飞行并给后面的东西也上色
-				Destroy(); 
-				return; // 提前退出函数
-			}
-			else { UE_LOG(LogTemp, Error, TEXT("[Projectile]: 失败! 重叠的 Pawn 没有 UColorComponent!")); }
-		}
-		else { UE_LOG(LogTemp, Warning, TEXT("[Projectile]: OnOverlapBegin 重叠的 %s 不是 APossessablePawn。忽略上色。"), *OtherActor->GetName()); }
-        
-		// (你也可以在这里添加对其他类型Actor的检查，比如墙壁，如果希望子弹碰到墙就消失)
-		// if (Cast<AStaticMeshActor>(OtherActor)) { Destroy(); return; }
-	}
-    
-	// 如果上面的逻辑没有销毁它 (比如它穿过了Pawn但没找到组件)，
-	// 我们可能不希望它在这里销毁，让它继续飞行直到 lifespan 结束
-	// Destroy(); // <--- 移除这行，或者根据你的设计决定
+        // --- THE RULE ---
+        // Can we paint it? Only if the target is currently Grey (EC_None)
+        // AND the projectile is NOT Grey (we removed the erase mechanic)
+        if (TargetCurrentColor == EColor::EC_None && ProjColor != EColor::EC_None)
+        {
+            // Yes, paint it!
+            UE_LOG(LogTemp, Log, TEXT("[Projectile]: Target %s is Grey. Painting with %d."), *OtherActor->GetName(), (int32)ProjColor);
+            TargetColorComp->SetColor(ProjColor);
+            Destroy(); // Destroy projectile after successful paint
+            return;
+        }
+        else if (TargetCurrentColor != EColor::EC_None)
+        {
+            // Target already has color, cannot paint over.
+             UE_LOG(LogTemp, Log, TEXT("[Projectile]: Target %s already has color %d. Cannot paint over."), *OtherActor->GetName(), (int32)TargetCurrentColor);
+             // Play ineffective sound maybe
+             Destroy(); // Destroy projectile on ineffective hit
+             return;
+        }
+        else // ProjColor == EColor::EC_None (Grey projectile hitting Grey target)
+        {
+             UE_LOG(LogTemp, Log, TEXT("[Projectile]: Grey projectile hit Grey target %s. No effect."), *OtherActor->GetName());
+             Destroy(); // Destroy projectile
+             return;
+        }
+    }
+    else
+    {
+        // Target does not have a ColorComponent (e.g., wall, floor)
+        UE_LOG(LogTemp, Log, TEXT("[Projectile]: Target %s does not have a ColorComponent. Destroying projectile."), *OtherActor->GetName());
+        Destroy(); // Destroy projectile upon hitting non-colorable surface
+        return;
+    }
+
+    // Fallback destroy just in case (shouldn't be reached with returns above)
+    // Destroy();
 }
