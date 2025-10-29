@@ -102,8 +102,24 @@ EColor AColorProjectile::GetProjectileColor() const
 
 void AColorProjectile::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	// Basic checks
-	if (!OtherActor || OtherActor == this) return;
+    // Basic checks: Ignore invalid actors and self-overlaps
+	if (!OtherActor || OtherActor == this)
+    {
+        return; // Do nothing if overlapping self or nothing
+    }
+
+    // --- [!! NEW CHECK: Ignore Owner/Instigator !!] ---
+    // GetOwner() usually returns the Character who spawned the projectile.
+    // GetInstigator() is another way to track who fired it. Checking both is safest.
+    if (OtherActor == GetOwner() || OtherActor == GetInstigator())
+    {
+        UE_LOG(LogTemp, Log, TEXT("[Projectile]: Overlap with owner/instigator (%s). Ignoring."), *OtherActor->GetName());
+        return; // Do nothing, DO NOT destroy
+    }
+    // --- [!! END NEW CHECK !!] ---
+
+    // If we've reached here, we overlapped something valid *other* than the player.
+
     UE_LOG(LogTemp, Warning, TEXT("[Projectile]: Overlap with: %s"), *OtherActor->GetName());
 
     // Attempt to get the target's ColorComponent
@@ -115,29 +131,27 @@ void AColorProjectile::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, 
         EColor TargetCurrentColor = TargetColorComp->GetColor();
         EColor ProjColor = GetProjectileColor();
 
-        // --- THE RULE ---
-        // Can we paint it? Only if the target is currently Grey (EC_None)
-        // AND the projectile is NOT Grey (we removed the erase mechanic)
+        // --- Painting Rule ---
+        // Can we paint it? Only if the target is Grey (EC_None)
+        // AND the projectile is NOT Grey
         if (TargetCurrentColor == EColor::EC_None && ProjColor != EColor::EC_None)
         {
-            // Yes, paint it!
             UE_LOG(LogTemp, Log, TEXT("[Projectile]: Target %s is Grey. Painting with %d."), *OtherActor->GetName(), (int32)ProjColor);
             TargetColorComp->SetColor(ProjColor);
             Destroy(); // Destroy projectile after successful paint
             return;
         }
-        else if (TargetCurrentColor != EColor::EC_None)
+        else // Target already has color, or projectile is grey
         {
-            // Target already has color, cannot paint over.
-             UE_LOG(LogTemp, Log, TEXT("[Projectile]: Target %s already has color %d. Cannot paint over."), *OtherActor->GetName(), (int32)TargetCurrentColor);
-             // Play ineffective sound maybe
-             Destroy(); // Destroy projectile on ineffective hit
-             return;
-        }
-        else // ProjColor == EColor::EC_None (Grey projectile hitting Grey target)
-        {
-             UE_LOG(LogTemp, Log, TEXT("[Projectile]: Grey projectile hit Grey target %s. No effect."), *OtherActor->GetName());
-             Destroy(); // Destroy projectile
+             if (TargetCurrentColor != EColor::EC_None)
+             {
+                 UE_LOG(LogTemp, Log, TEXT("[Projectile]: Target %s already has color %d. Cannot paint over."), *OtherActor->GetName(), (int32)TargetCurrentColor);
+             }
+             else // ProjColor == EColor::EC_None
+             {
+                 UE_LOG(LogTemp, Log, TEXT("[Projectile]: Grey projectile hit Grey target %s. No effect."), *OtherActor->GetName());
+             }
+             Destroy(); // Destroy projectile on ineffective hit on a colorable target
              return;
         }
     }
@@ -149,6 +163,6 @@ void AColorProjectile::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, 
         return;
     }
 
-    // Fallback destroy just in case (shouldn't be reached with returns above)
+    // Fallback destroy just in case (shouldn't be reached)
     // Destroy();
 }
