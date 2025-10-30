@@ -45,4 +45,18 @@ public:
 	/** Map of colors to materials */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Materials")
 	TMap<EColor, TObjectPtr<UMaterialInterface>> ColorMaterials;
+
+	/**
+	 * 当此组件的颜色被更新时（在 OnRep_CurrentColor 之后）调用的蓝图事件。
+	 * 你应该在蓝图中覆盖此事件，以应用物理效果 (如飘浮、燃烧等)。
+	 * @param NewColor 当前组件的新颜色。
+	 * @param OldColor 组件之前的颜色 (用于移除旧效果)。
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Color Magic")
+	void OnColorEffectChanged(EColor NewColor, EColor OldColor);
+
+private:
+	/** 存储上一次的颜色，用于 OnColorEffectChanged */
+	UPROPERTY()
+	EColor PreviousColor;
 };

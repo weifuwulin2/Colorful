@@ -3,84 +3,133 @@
 #include "ColorSourceActor.h"
 #include "PossessablePawn.h"
 #include "GameFramework/PlayerController.h"
-#include "ColorMageCharacter.h" // 需要包含角色头文件
-#include "ColorMageController.h" // 需要包含控制器头文件
+#include "ColorMageCharacter.h"
+#include "ColorMageController.h"
 
-/** 处理交互的总入口 */
-void UColorManagerSubsystem::HandlePlayerInteraction(APlayerController* Player, AActor* HitActor)
+/** (RMB) 处理汲取和混合逻辑 */
+void UColorManagerSubsystem::HandleAcquireColor(APlayerController* Player, AColorSourceActor* ColorSource)
 {
-	if (!Player || !HitActor) return;
-
-	// 情况 1: 击中颜色源
-	if (AColorSourceActor* ColorSource = Cast<AColorSourceActor>(HitActor))
-	{
-		ExtractColor(Player, ColorSource);
-		return;
-	}
-
-	// 情况 2: 击中可附身 Pawn
-	if (APossessablePawn* PossessablePawn = Cast<APossessablePawn>(HitActor))
-	{
-		AttemptPossession(Player, PossessablePawn);
-		return;
-	}
-}
-
-/** 汲取颜色 */
-void UColorManagerSubsystem::ExtractColor(APlayerController* Player, AColorSourceActor* ColorSource)
-{
+	if (!Player || !ColorSource) return;
 	AColorMagePlayerState* PlayerState = Player->GetPlayerState<AColorMagePlayerState>();
-	if (PlayerState && ColorSource)
-	{
-		// 通过服务器设置 PlayerState 的颜色
-		PlayerState->Server_SetCurrentColor(ColorSource->GetColor());
-	}
+	if (!PlayerState) return;
+
+	EColor PlayerColor = PlayerState->GetCurrentColor();
+	EColor SourceColor = ColorSource->GetColorToProvide(); 
+
+	// 1. 计算新颜色
+	EColor NewColor = GetMixedColor(PlayerColor, SourceColor);
+
+	// 2. 设置新颜色
+	PlayerState->Server_SetCurrentColor(NewColor);
 }
 
-/** 尝试附身 (包含隐藏逻辑) */
+/** (F) 尝试附身 (保持不变) */
 void UColorManagerSubsystem::AttemptPossession(APlayerController* Player, APossessablePawn* TargetPawn)
 {
-	// 获取必要的状态和对象
 	AColorMagePlayerState* PlayerState = Player->GetPlayerState<AColorMagePlayerState>();
 	AColorMageController* MageController = Cast<AColorMageController>(Player);
-	AColorMageCharacter* CurrentCharacter = Cast<AColorMageCharacter>(Player->GetPawn()); // 获取当前控制的角色
-
-	// 确保所有对象都有效
-	if (!PlayerState || !TargetPawn || !MageController || !CurrentCharacter)
-	{
-		UE_LOG(LogTemp, Error, TEXT("AttemptPossession 失败：缺少必要对象。"));
-		return;
-	}
+	AColorMageCharacter* CurrentCharacter = Cast<AColorMageCharacter>(Player->GetPawn()); 
+	if (!PlayerState || !TargetPawn || !MageController || !CurrentCharacter) { return; }
 
 	EColor PlayerColor = PlayerState->GetCurrentColor();
 	EColor TargetColor = TargetPawn->GetColor();
 
-	// 检查颜色是否匹配 (且玩家有颜色)
+	// GDD 规则：颜色必须完全一致
 	if (PlayerColor != EColor::EC_None && PlayerColor == TargetColor)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ColorManager: 颜色匹配，正在执行附身..."));
-
-		// --- [!! 隐藏逻辑 !!] ---
-		// 1. 告诉 Controller 记住这个即将被隐藏的角色
-		//    (通过友元类访问私有成员)
+		UE_LOG(LogTemp, Warning, TEXT("ColorManager: 匹配成功，正在执行附身..."));
 		MageController->HiddenCharacter = CurrentCharacter;
-
-		// 2. 隐藏角色并禁用其功能
-		CurrentCharacter->SetActorHiddenInGame(true);      // 在游戏中隐藏
-		CurrentCharacter->SetActorEnableCollision(false); // 禁用碰撞
-		CurrentCharacter->SetActorTickEnabled(false);     // 禁用 Tick
-		// --- [!! 隐藏逻辑结束 !!] ---
-
-		// 解除对当前角色的附身
+		CurrentCharacter->SetActorHiddenInGame(true);
+		CurrentCharacter->SetActorEnableCollision(false);
+		CurrentCharacter->SetActorTickEnabled(false);
 		Player->UnPossess();
-		
-		// 附身到目标 Pawn
-		Player->Possess(TargetPawn); 
-		
-		UE_LOG(LogTemp, Log, TEXT("成功附身到 %s"), *TargetPawn->GetName());
+		Player->Possess(TargetPawn);
 	}
-	else
+	else 
+	{ 
+		UE_LOG(LogTemp, Warning, TEXT("ColorManager: 附身失败，颜色不匹配。"));
+	}
+}
+
+
+// --- [!! GDD 修正：混合规则实现 !!] ---
+
+/** 检查颜色是否为基础元素色 (红, 黄, 蓝) */
+bool UColorManagerSubsystem::IsPrimaryElement(EColor Color) const
+{
+	return Color == EColor::EC_Red || Color == EColor::EC_Yellow || Color == EColor::EC_Blue;
+}
+
+/** 检查颜色是否为调节色 (白, 黑) */
+bool UColorManagerSubsystem::IsModifier(EColor Color) const
+{
+	return Color == EColor::EC_White || Color == EColor::EC_Black;
+}
+
+/** 检查颜色是否为 *任何* 类型的混合色 */
+bool UColorManagerSubsystem::IsMixedColor(EColor Color) const
+{
+	// 如果它既不是基础色，也不是调节色，也不是 None，那它一定是混合色
+	return Color != EColor::EC_None && !IsPrimaryElement(Color) && !IsModifier(Color);
+}
+
+/**
+ * 根据 GDD 规则计算新颜色
+ */
+EColor UColorManagerSubsystem::GetMixedColor(EColor PlayerCurrentColor, EColor SourceColor) const
+{
+	// 规则 1: 重置规则 (手中是混合色 -> 覆盖)
+	if (IsMixedColor(PlayerCurrentColor))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ColorManager: 附身失败，颜色不匹配或玩家无颜色。玩家颜色: %d, 目标颜色: %d"), (int32)PlayerColor, (int32)TargetColor);
+		return SourceColor;
 	}
+	
+	// 规则 2: GDD 规则 (元素色 + 调节色)
+	if (IsPrimaryElement(PlayerCurrentColor) && IsModifier(SourceColor))
+	{
+		if (PlayerCurrentColor == EColor::EC_Red)
+		{
+			if (SourceColor == EColor::EC_White) return EColor::EC_LightRed;
+			if (SourceColor == EColor::EC_Black) return EColor::EC_DarkRed;
+		}
+		if (PlayerCurrentColor == EColor::EC_Yellow)
+		{
+			if (SourceColor == EColor::EC_White) return EColor::EC_LightYellow;
+			if (SourceColor == EColor::EC_Black) return EColor::EC_DarkYellow;
+		}
+		if (PlayerCurrentColor == EColor::EC_Blue)
+		{
+			if (SourceColor == EColor::EC_White) return EColor::EC_LightBlue;
+			if (SourceColor == EColor::EC_Black) return EColor::EC_DarkBlue;
+		}
+	}
+	
+	// 规则 3: GDD 规则 (元素色 + 元素色)
+	if (IsPrimaryElement(PlayerCurrentColor) && IsPrimaryElement(SourceColor))
+	{
+		if ((PlayerCurrentColor == EColor::EC_Red && SourceColor == EColor::EC_Yellow) || (PlayerCurrentColor == EColor::EC_Yellow && SourceColor == EColor::EC_Red))
+			return EColor::EC_Orange;
+		if ((PlayerCurrentColor == EColor::EC_Yellow && SourceColor == EColor::EC_Blue) || (PlayerCurrentColor == EColor::EC_Blue && SourceColor == EColor::EC_Yellow))
+			return EColor::EC_Green;
+		if ((PlayerCurrentColor == EColor::EC_Red && SourceColor == EColor::EC_Blue) || (PlayerCurrentColor == EColor::EC_Blue && SourceColor == EColor::EC_Red))
+			return EColor::EC_Purple;
+	}
+	
+	// 规则 4: GDD 规则 (调节色 + 调节色)
+	if (IsModifier(PlayerCurrentColor) && IsModifier(SourceColor))
+	{
+		if ((PlayerCurrentColor == EColor::EC_White && SourceColor == EColor::EC_Black) || (PlayerCurrentColor == EColor::EC_Black && SourceColor == EColor::EC_White))
+			return EColor::EC_Grey_Neutral;
+	}
+	
+	// 规则 5: GDD 规则 (调节色 + 元素色 -> 覆盖)
+	if (IsModifier(PlayerCurrentColor) && IsPrimaryElement(SourceColor))
+	{
+		return SourceColor; 
+	}
+	
+	// 规则 6: 默认覆盖
+	// (例如：手中是空 + 汲取任何颜色 -> 覆盖)
+	// (例如：手中颜色与汲取颜色相同 -> 覆盖，即刷新)
+	return SourceColor;
 }

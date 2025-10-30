@@ -19,90 +19,64 @@ class COLORMAGE_API AColorMageCharacter : public ACharacter
 
 public:
 	AColorMageCharacter();
-	virtual void Tick(float DeltaTime) override;
+	// [!! 已修改 !!] Tick 已移除
+	// virtual void Tick(float DeltaTime) override;
 
-	UFUNCTION(BlueprintPure, Category = "UI") // BlueprintPure makes it easily accessible
+	UFUNCTION(BlueprintPure, Category = "UI")
 	EPawnControlType GetControlType() const { return ControlType; }
-	
+
 protected:
-	// --- Input Assets ---
+	// --- [!! GDD 修正：输入 !!] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> JumpAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> DashAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	TObjectPtr<UInputAction> FireProjectileAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	TObjectPtr<UInputAction> AimAction;
+	TObjectPtr<UInputAction> FireProjectileAction; // (LMB)
+	// [!! 已移除 !!] AimAction
+	// --- [!! GDD 修正结束 !!] ---
 
-	// --- Camera Config ---
+	// --- [!! GDD 修正：简化摄像机 !!] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	float DefaultCameraDist = 600.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	FVector DefaultCameraOffset = FVector(0.0f, 60.0f, 40.0f);
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
-	float AimingCameraDist = 150.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
-	FVector AimingCameraOffset = FVector(0.0f, 70.0f, 50.0f);
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
-	float ZoomInterpSpeed = 15.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
-	float HipFireRotationSpeed = 10.0f;
+	// [!! 已移除 !!] AimingCameraDist, AimingCameraOffset, ZoomInterpSpeed, HipFireRotationSpeed
+	// --- [!! GDD 修正结束 !!] ---
 
-	// --- Dash Config ---
+	// ... (Dash 和 Projectile Config 保持不变) ...
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	TObjectPtr<UAnimMontage> DashMontage;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
-	float DashDistance = 500.0f;
+	float DashDistance = 1000.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash")
 	float DashDuration = 0.25f;
-	
-	// --- Projectile Config ---
 	UPROPERTY(EditDefaultsOnly, Category = "Combat")
 	TSubclassOf<AColorProjectile> ProjectileClass;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 	FName ProjectileSpawnSocketName = "BrushTip";
-	
+
+	/** 角色 UI 控制类型 */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	EPawnControlType ControlType = EPawnControlType::Character;
+
 private:
-	// --- Cached Components & Timers ---
+	// --- [!! GDD 修正：已清理 !!] ---
 	TObjectPtr<USpringArmComponent> CameraSpringArm;
 	float DefaultGravityScale;
 	FTimerHandle TimerHandle_DashFinished;
-
-	/** Tracks if the player is holding the Aim button */
-	bool bIsManuallyAiming = false;
-	
-	/** Tracks if we are currently lerping our rotation from a hip-fire */
-	bool bIsLerpingRotation = false; 
-	
-	/** The rotation we are trying to lerp to */
-	FRotator TargetRotation;
-
-	// --- Target values for smooth zoom ---
-	float TargetArmLength;
-	FVector TargetSocketOffset;
-
+	// [!! 已移除 !!] bIsManuallyAiming, bIsLerpingRotation, TargetRotation, TimerHandle_AutoAimReset
+	// [!! 已移除 !!] TargetArmLength, TargetSocketOffset
+	// --- [!! GDD 修正结束 !!] ---
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-	/** 当这个角色被控制器附身时调用 (用于取消隐藏) */
 	virtual void PossessedBy(AController* NewController) override;
-
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "UI") // VisibleDefaultsOnly is appropriate here
-	EPawnControlType ControlType = EPawnControlType::Character;
 
 	// --- Input Handlers ---
 	void OnDash();
 	void OnDashFinished();
 	void OnFireProjectile();
-	void OnAimStarted();
-	void OnAimCompleted();
-
-	// --- Helper Functions ---
-	void SetAimRotation(bool bIsAiming);
-	void SetAimZoom(bool bIsZooming);
-
-	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
+	// [!! 已移除 !!] OnAimStarted, OnAimCompleted
 };

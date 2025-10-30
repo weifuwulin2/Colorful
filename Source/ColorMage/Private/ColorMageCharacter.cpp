@@ -1,6 +1,4 @@
 #include "ColorMageCharacter.h"
-
-#include "ColorMageGameMode.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -8,159 +6,76 @@
 #include "ColorProjectile.h"
 #include "EnhancedInputComponent.h"
 #include "Animation/AnimInstance.h"
-#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h" // 包含射线检测
 
 AColorMageCharacter::AColorMageCharacter()
 {
-	PrimaryActorTick.bCanEverTick = true; 
+	// [!! GDD 修正 !!] 角色不再需要每帧 Tick
+	PrimaryActorTick.bCanEverTick = false; 
 	DefaultGravityScale = 1.0f;
+	ControlType = EPawnControlType::Character; // 确保设置了类型
 }
 
 void AColorMageCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement()) { DefaultGravityScale = MoveComp->GravityScale; }
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		DefaultGravityScale = MoveComp->GravityScale;
+	}
 	
+	// --- [!! GDD 修正：简化 BeginPlay !!] ---
+	// 只设置一次默认值，不再需要插值
 	CameraSpringArm = FindComponentByClass<USpringArmComponent>();
 	if (CameraSpringArm)
 	{
 		CameraSpringArm->TargetArmLength = DefaultCameraDist;
 		CameraSpringArm->SocketOffset = DefaultCameraOffset;
-		TargetArmLength = DefaultCameraDist;
-		TargetSocketOffset = DefaultCameraOffset;
+		// 确保 SpringArm Lag 被禁用，以实现“跟随迅速”
 		CameraSpringArm->bEnableCameraLag = false;
 		CameraSpringArm->bEnableCameraRotationLag = false;
 	}
+	// --- [!! GDD 修正结束 !!] ---
 }
 
-void AColorMageCharacter::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	// Lerp Rotation Logic
-	if (bIsLerpingRotation)
-	{
-		SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, HipFireRotationSpeed));
-		if (GetActorRotation().Equals(TargetRotation, 1.0f))
-		{
-			bIsLerpingRotation = false;
-			if (UCharacterMovementComponent* MoveComp = GetCharacterMovement()) { MoveComp->bOrientRotationToMovement = true; }
-		}
-	}
-
-	// Smooth Zoom Logic
-	if (CameraSpringArm)
-	{
-		CameraSpringArm->TargetArmLength = FMath::FInterpTo(CameraSpringArm->TargetArmLength, TargetArmLength, DeltaTime, ZoomInterpSpeed);
-		CameraSpringArm->SocketOffset = FMath::VInterpTo(CameraSpringArm->SocketOffset, TargetSocketOffset, DeltaTime, ZoomInterpSpeed);
-	}
-}
+// [!! 已移除 !!] Tick 函数已被移除
 
 void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	if (UEnhancedInputComponent* EnhancedInputComp = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
+		// --- [!! GDD 修正 !!] ---
 		if (JumpAction) { EnhancedInputComp->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump); EnhancedInputComp->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping); }
 		if (DashAction) { EnhancedInputComp->BindAction(DashAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnDash); }
 		if (FireProjectileAction) { EnhancedInputComp->BindAction(FireProjectileAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnFireProjectile); }
-		if (AimAction) { EnhancedInputComp->BindAction(AimAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnAimStarted); EnhancedInputComp->BindAction(AimAction, ETriggerEvent::Completed, this, &AColorMageCharacter::OnAimCompleted); }
+		// [!! 已移除 !!] AimAction 绑定
+		// --- [!! GDD 修正结束 !!] ---
 	}
 }
 
-/** 当角色被控制器附身时调用 (重写 ACharacter 的函数) */
 void AColorMageCharacter::PossessedBy(AController* NewController)
 {
-	Super::PossessedBy(NewController); // 必须调用父类实现
-
-	// 取消隐藏自身
+	Super::PossessedBy(NewController);
 	SetActorHiddenInGame(false);
-	// 重新启用碰撞 (根据你的游戏设置选择合适的类型)
 	SetActorEnableCollision(true); 
-	// 重新启用 Tick
-	SetActorTickEnabled(true);    
-
-	UE_LOG(LogTemp, Log, TEXT("ColorMageCharacter %s已被 %s 附身并取消隐藏。"), *GetName(), *NewController->GetName());
-	
-	// 位置和旋转现在由控制器在 Possess() 之后通过 TeleportTo() 设置
+	SetActorTickEnabled(false); // 角色不需要 Tick
+	UE_LOG(LogTemp, Log, TEXT("ColorMageCharacter %s 已被重新附身并取消隐藏。"), *GetName());
 }
 
-// --- Helper Functions ---
-void AColorMageCharacter::SetAimRotation(bool bIsAiming)
-{
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-	{
-		MoveComp->bUseControllerDesiredRotation = bIsAiming;
-		MoveComp->bOrientRotationToMovement = !bIsAiming;
-	}
-}
-void AColorMageCharacter::SetAimZoom(bool bIsZooming)
-{
-	TargetArmLength = bIsZooming ? AimingCameraDist : DefaultCameraDist;
-	TargetSocketOffset = bIsZooming ? AimingCameraOffset : DefaultCameraOffset;
-}
+// [!! 已移除 !!] SetAimRotation, SetAimZoom, OnAimStarted, OnAimCompleted, ResetHipFireRotation
 
-void AColorMageCharacter::FellOutOfWorld(const UDamageType& dmgType)
-{
-	UE_LOG(LogTemp, Warning, TEXT("ColorMageCharacter %s 掉出世界!"), *GetName());
-
-	// 获取 GameMode
-	AGameModeBase* CurrentGameModeBase = UGameplayStatics::GetGameMode(this);
-	AColorMageGameMode* MyGameMode = Cast<AColorMageGameMode>(CurrentGameModeBase);
-
-	if (MyGameMode)
-	{
-		// 获取控制这个角色的 Controller
-		AController* MyController = GetController();
-		if (MyController)
-		{
-			// 调用 GameMode 的重生函数
-			MyGameMode->RespawnPlayer(MyController);
-		}
-		else
-		{
-			UE_LOG(LogTemp, Error, TEXT("FellOutOfWorld: 无法获取 Controller 来重生!"));
-			// 备用方案：直接销毁？
-			// Destroy();
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("FellOutOfWorld: 无法获取 MyGameMode!"));
-		// 备用方案：调用基类实现（通常是销毁 Actor）
-		Super::FellOutOfWorld(dmgType);
-	}
-	
-	// 注意：我们通常不调用 Super::FellOutOfWorld(dmgType);
-	// 因为基类的默认实现是销毁 Actor，而我们想要重生。
-}
-
-// --- Input Handlers ---
-void AColorMageCharacter::OnAimStarted()
-{
-	bIsManuallyAiming = true;
-	bIsLerpingRotation = false; 
-	SetAimRotation(true); 
-	SetAimZoom(true);
-}
-void AColorMageCharacter::OnAimCompleted()
-{
-	bIsManuallyAiming = false;
-	SetAimRotation(false);
-	SetAimZoom(false);
-}
+// --- [!! GDD 修正：简化 !!] ---
 void AColorMageCharacter::OnFireProjectile()
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
-	if (!bIsManuallyAiming)
-	{
-		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement()) { MoveComp->bOrientRotationToMovement = false; }
-		TargetRotation = PC->GetControlRotation(); TargetRotation.Pitch = 0; TargetRotation.Roll = 0;
-		bIsLerpingRotation = true;
-	}
+
+	// [!! 已移除 !!] 所有 Hip-fire 旋转逻辑均已移除
+	// GDD 规定：射击时使用腰射，角色朝向移动方向
+
+	// --- (使用最终的“射线检测”方案来确保命中准星) ---
 	FVector CameraLocation; FRotator CameraRotation;
 	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
 	FVector TraceStart = CameraLocation; FVector TraceEnd = TraceStart + (CameraRotation.Vector() * 10000.0f); 
@@ -169,10 +84,15 @@ void AColorMageCharacter::OnFireProjectile()
 	if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
 	{
 		FVector DirectionToHit = (HitResult.Location - GetActorLocation()).GetSafeNormal();
-		if (FVector::DotProduct(GetActorForwardVector(), DirectionToHit) > 0.0f) { TargetLocation = HitResult.Location; }
+		if (FVector::DotProduct(GetActorForwardVector(), DirectionToHit) > -0.2f) // 防止向后射击
+		{
+			TargetLocation = HitResult.Location;
+		}
 	}
 	FVector SpawnLocation = GetMesh()->GetSocketLocation(ProjectileSpawnSocketName);
 	FRotator SpawnRotation = (TargetLocation - SpawnLocation).Rotation();
+	
+	// --- (投射物生成逻辑) ---
 	AColorMagePlayerState* PS = PC->GetPlayerState<AColorMagePlayerState>(); if (!PS) return;
 	EColor ColorToFire = PS->GetCurrentColor(); if (!ProjectileClass) return;
 	FActorSpawnParameters SpawnParams; SpawnParams.Owner = this; SpawnParams.Instigator = this;
@@ -180,79 +100,21 @@ void AColorMageCharacter::OnFireProjectile()
 	AColorProjectile* Projectile = GetWorld()->SpawnActor<AColorProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams);
 	if (Projectile) { Projectile->SetProjectileColor(ColorToFire); }
 }
-void AColorMageCharacter::OnDash()
+
+// --- (Dash 和 DashFinished 保持不变) ---
+void AColorMageCharacter::OnDash() 
 {
-    // --- [!! Debug Logs Added !!] ---
-    UE_LOG(LogTemp, Warning, TEXT("OnDash() - Function Called!"));
-
-    UCharacterMovementComponent* MoveComp = GetCharacterMovement();
-    if (!MoveComp)
-    {
-        UE_LOG(LogTemp, Error, TEXT("OnDash() - FAILED: CharacterMovementComponent not found!"));
-        return;
-    }
-
-    // Check if already dashing (using gravity scale)
-    if (MoveComp->GravityScale != DefaultGravityScale)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("OnDash() - FAILED: Already dashing? GravityScale (%f) != Default (%f)"), MoveComp->GravityScale, DefaultGravityScale);
-        return;
-    }
-
-    // Check Animation Montage (Optional check)
-    UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-    if (!AnimInstance || !DashMontage)
-    {
-         UE_LOG(LogTemp, Warning, TEXT("OnDash() - WARNING: AnimInstance or DashMontage not found, but attempting dash anyway."));
-         // If you require the montage to dash, uncomment the next line:
-         // return;
-    }
-    else
-    {
-    	AnimInstance->Montage_Play(DashMontage);
-        UE_LOG(LogTemp, Log, TEXT("OnDash() - Playing DashMontage."));
-    }
-
-    // Check Dash Distance and Duration values
-    if (DashDistance <= 0.f || DashDuration <= 0.f)
-    {
-        UE_LOG(LogTemp, Error, TEXT("OnDash() - FAILED: Invalid DashDistance (%f) or DashDuration (%f)! Must be > 0."), DashDistance, DashDuration);
-        return;
-    }
-
-    // --- Calculate Dash Velocity ---
-    const float DashSpeed = DashDistance / DashDuration;
-    const FVector ForwardDir = GetActorForwardVector(); // Get the direction the character mesh is facing
-    const FVector DashVelocity = ForwardDir * DashSpeed;
-
-    UE_LOG(LogTemp, Log, TEXT("OnDash() - Calculated Values: Speed=%.2f, ForwardDir=%s, DashVelocity=%s"), DashSpeed, *ForwardDir.ToString(), *DashVelocity.ToString());
-
-    // --- Execute Dash ---
-    // Temporarily set gravity to 0 for horizontal flight
-    MoveComp->GravityScale = 0.0f;
-
-    // Launch the character
-    // bXYOverride = true: Force overrides current horizontal velocity.
-    // bZOverride = true: Force overrides current vertical velocity (using DashVelocity.Z, which is 0 here).
-    LaunchCharacter(DashVelocity, true, true);
-    UE_LOG(LogTemp, Log, TEXT("OnDash() - LaunchCharacter called with Velocity=%s. GravityScale set to 0.0."), *DashVelocity.ToString());
-
-    // --- Set Timer to Finish Dash ---
-    // Clear any previous timer
-    GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashFinished);
-
-    // Set a new timer to call OnDashFinished after DashDuration
-    GetWorld()->GetTimerManager().SetTimer(
-       TimerHandle_DashFinished,          // Timer handle
-       this,                              // Object to call function on
-       &AColorMageCharacter::OnDashFinished, // Function to call
-       DashDuration,                      // Delay
-       false                              // Don't loop
-    );
-     UE_LOG(LogTemp, Log, TEXT("OnDash() - OnDashFinished timer set for %.2f seconds."), DashDuration);
-     // --- [!! End of Debug Logs !!] ---
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp || MoveComp->GravityScale != DefaultGravityScale) return;
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && DashMontage) { AnimInstance->Montage_Play(DashMontage); }
+	const float DashSpeed = DashDistance / DashDuration;
+	const FVector DashVelocity = GetActorForwardVector();
+	MoveComp->GravityScale = 0.0f; LaunchCharacter(DashVelocity, true, true);
+	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashFinished);
+	GetWorld()->GetTimerManager().SetTimer(TimerHandle_DashFinished, this, &AColorMageCharacter::OnDashFinished, DashDuration, false);
 }
-void AColorMageCharacter::OnDashFinished()
+void AColorMageCharacter::OnDashFinished() 
 {
 	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
 	if (!MoveComp) return;

@@ -19,24 +19,25 @@ class COLORMAGE_API UColorManagerSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
 public:
-	/**
-	 * Main entry point for all player interactions (called by the Controller).
-	 * @param Player The PlayerController triggering the interaction.
-	 * @param HitActor The Actor that was hit by the player's line trace.
-	 */
+	/** (RMB) 处理汲取和混合逻辑 */
 	UFUNCTION(BlueprintCallable, Category = "Color Magic")
-	void HandlePlayerInteraction(APlayerController* Player, AActor* HitActor);
+	void HandleAcquireColor(APlayerController* Player, AColorSourceActor* ColorSource);
 
-	/**
-	 * Logic for extracting color from a source.
-	 */
-	UFUNCTION(BlueprintCallable, Category = "Color Magic")
-	void ExtractColor(APlayerController* Player, AColorSourceActor* ColorSource);
-
-	/**
-	 * Logic for attempting to possess an object.
-	 * This will ONLY succeed if the player's color matches the target's color.
-	 */
+	/** (F) 尝试附身到"可附身物体" */
 	UFUNCTION(BlueprintCallable, Category = "Color Magic")
 	void AttemptPossession(APlayerController* Player, APossessablePawn* TargetPawn);
+
+protected:
+	// --- [!! 混合逻辑辅助函数 (已重构) !!] ---
+
+	/** 根据 GDD 规则计算新颜色 */
+	UFUNCTION()
+	EColor GetMixedColor(EColor PlayerCurrentColor, EColor SourceColor) const;
+	
+	/** 检查颜色是否为基础元素色 (红, 黄, 蓝) */
+	bool IsPrimaryElement(EColor Color) const;
+	/** 检查颜色是否为调节色 (白, 黑) */
+	bool IsModifier(EColor Color) const;
+	/** 检查颜色是否为 *任何* 类型的混合色 (橙, 绿, 紫, 浅红, 深红...) */
+	bool IsMixedColor(EColor Color) const;
 };

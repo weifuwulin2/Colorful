@@ -17,9 +17,8 @@ class COLORMAGE_API AColorSourceActor : public AActor
 public: 
 	AColorSourceActor();
 
-	/** Gets the color from the ColorComponent */
 	UFUNCTION(BlueprintCallable, Category = "Color Magic")
-	EColor GetColor() const;
+	EColor GetColorToProvide() const { return ColorToProvide; }
 
 protected:
 	/** Called when the game starts or when spawned */
@@ -28,10 +27,6 @@ protected:
 	protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
-
-	/** Handles the color logic and material swapping */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UColorComponent> ColorComponent;
 
 	// --- [!! ADDED !!] ---
 	/** The Niagara particle system component for the effect */
@@ -43,4 +38,6 @@ protected:
 	float EffectScaleMultiplier = 1.0f;
 	// --- [!! ADDED END !!] ---
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
+	EColor ColorToProvide = EColor::EC_Red;
 };

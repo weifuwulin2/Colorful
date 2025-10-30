@@ -10,11 +10,7 @@ AColorSourceActor::AColorSourceActor()
 	// Create the MeshComponent first so it can be the Root
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	SetRootComponent(MeshComponent);
-
-	// Create the ColorComponent
-	ColorComponent = CreateDefaultSubobject<UColorComponent>(TEXT("ColorComponent"));
-
-	// --- [!! ADDED !!] ---
+	
 	// Create the NiagaraComponent
 	NiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraComponent"));
     
@@ -41,14 +37,4 @@ void AColorSourceActor::BeginPlay()
 
 	
 }
-// --- [!! ADDED END !!] ---
 
-/** Gets the color from the ColorComponent */
-EColor AColorSourceActor::GetColor() const
-{
-	if (ColorComponent)
-	{
-		return ColorComponent->GetColor();
-	}
-	return EColor::EC_None;
-}
