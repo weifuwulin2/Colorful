@@ -7,26 +7,40 @@
 #include "GameFramework/Actor.h"
 #include "ColorSourceActor.generated.h"
 class UColorComponent;
+class UNiagaraComponent;
 
 UCLASS()
 class COLORMAGE_API AColorSourceActor : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+    
+public: 
 	AColorSourceActor();
 
-	/** [!! 已修改 !!] 函数现在“转发”给组件 */
+	/** Gets the color from the ColorComponent */
 	UFUNCTION(BlueprintCallable, Category = "Color Magic")
 	EColor GetColor() const;
 
 protected:
+	/** Called when the game starts or when spawned */
+	virtual void BeginPlay() override; // <--- [!! ADDED !!]
+
+	protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
 
-	// --- [!! 新增 !!] ---
-	/** 我们新的颜色逻辑组件 */
+	/** Handles the color logic and material swapping */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UColorComponent> ColorComponent;
+
+	// --- [!! ADDED !!] ---
+	/** The Niagara particle system component for the effect */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UNiagaraComponent> NiagaraComponent;
+
+	/** An extra multiplier to adjust the effect's scale relative to the mesh */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Effects")
+	float EffectScaleMultiplier = 1.0f;
+	// --- [!! ADDED END !!] ---
 
 };
