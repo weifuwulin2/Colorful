@@ -7,56 +7,60 @@
 #include "Components/ActorComponent.h"
 #include "ColorComponent.generated.h"
 
-
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnColorChanged, EColor, NewColor, EColor, OldColor);
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class COLORMAGE_API UColorComponent : public UActorComponent
 {
 	GENERATED_BODY()
+
 public:	
 	UColorComponent();
+
 	UFUNCTION(BlueprintCallable, Category = "Color Magic")
 	EColor GetColor() const { return CurrentColor; }
-	UFUNCTION(BlueprintCallable, Category = "Color Magic")
-	void SetColor(EColor NewColor); // Should only set CurrentColor on server
 
-	protected:
+	UFUNCTION(BlueprintCallable, Category = "Color Magic")
+	void SetColor(EColor NewColor);
+
+	/** C++ 委托，当颜色改变时广播 */
+	UPROPERTY(BlueprintAssignable, Category = "Color Magic|Events")
+	FOnColorChanged OnColorChanged;
+
+protected:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** Called automatically when CurrentColor replicates */
+	/** RepNotify 函数，当 CurrentColor 改变时自动调用 */
 	UFUNCTION()
 	virtual void OnRep_CurrentColor();
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Color Magic")
 	TObjectPtr<UStaticMeshComponent> MeshToControl;
 
-	/** Current color state, replicates and calls OnRep_CurrentColor */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_CurrentColor, Category = "Color Magic")
 	EColor CurrentColor;
 
-	/** The default color applied at BeginPlay */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Materials")
 	EColor DefaultColor = EColor::EC_None;
 
-	/** Material for EC_None */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Materials")
 	TObjectPtr<UMaterialInterface> DefaultMaterial;
 
-	/** Map of colors to materials */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Materials")
 	TMap<EColor, TObjectPtr<UMaterialInterface>> ColorMaterials;
+	
+	/** 蓝图事件，用于实现物理效果等 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Color Magic", meta=(DisplayName="On Color Effect Changed (Blueprint)"))
+	void K2_OnColorEffectChanged(EColor NewColor, EColor OldColor);
 
-	/**
-	 * 当此组件的颜色被更新时（在 OnRep_CurrentColor 之后）调用的蓝图事件。
-	 * 你应该在蓝图中覆盖此事件，以应用物理效果 (如飘浮、燃烧等)。
-	 * @param NewColor 当前组件的新颜色。
-	 * @param OldColor 组件之前的颜色 (用于移除旧效果)。
-	 */
-	UFUNCTION(BlueprintImplementableEvent, Category = "Color Magic")
-	void OnColorEffectChanged(EColor NewColor, EColor OldColor);
+	/** 存储VFX */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Effects")
+	TMap<EColor, TObjectPtr<UParticleSystem>> ColorPaintVFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Effects")
+	TObjectPtr<UParticleSystem> DefaultPaintVFX;
 
 private:
-	/** 存储上一次的颜色，用于 OnColorEffectChanged */
 	UPROPERTY()
 	EColor PreviousColor;
 };

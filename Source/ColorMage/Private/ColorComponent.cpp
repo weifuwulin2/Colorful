@@ -3,6 +3,8 @@
 #include "Materials/MaterialInterface.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
+#include "Kismet/GameplayStatics.h"
+#include "Particles/ParticleSystem.h"
 
 UColorComponent::UColorComponent()
 {
@@ -10,7 +12,7 @@ UColorComponent::UColorComponent()
 	SetIsReplicatedByDefault(true);
 	DefaultColor = EColor::EC_None;
 	CurrentColor = DefaultColor;
-	PreviousColor = DefaultColor; // 初始化
+	PreviousColor = DefaultColor;
 }
 
 void UColorComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -26,11 +28,9 @@ void UColorComponent::BeginPlay()
 	{
 		MeshToControl = GetOwner()->FindComponentByClass<UStaticMeshComponent>();
 	}
-
-	// 强制应用默认颜色
 	if (GetOwner()->HasAuthority())
 	{
-		PreviousColor = DefaultColor; 
+		PreviousColor = DefaultColor;
 		CurrentColor = DefaultColor;
 		OnRep_CurrentColor();
 	}
@@ -41,8 +41,7 @@ void UColorComponent::SetColor(EColor NewColor)
 	if (GetOwner()->HasAuthority())
 	{
 		if (NewColor == CurrentColor) return;
-		
-		PreviousColor = CurrentColor; // 记录旧颜色
+		PreviousColor = CurrentColor;
 		CurrentColor = NewColor;
 		OnRep_CurrentColor();
 	}
@@ -53,11 +52,7 @@ void UColorComponent::OnRep_CurrentColor()
 	if (!MeshToControl)
 	{
 		MeshToControl = GetOwner()->FindComponentByClass<UStaticMeshComponent>();
-		if (!MeshToControl)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("ColorComponent 在 %s 上找不到 MeshToControl!"), *GetOwner()->GetName());
-			return;
-		}
+		if (!MeshToControl) { return; }
 	}
 
 	// 1. 更新材质
@@ -75,9 +70,30 @@ void UColorComponent::OnRep_CurrentColor()
 	}
 	MeshToControl->SetMaterial(0, MaterialToApply);
 	
-	// 2. [!! GDD 修正 !!] 调用蓝图事件以应用物理/元素效果
-	OnColorEffectChanged(CurrentColor, PreviousColor);
+	// 2. 播放 VFX
+	UParticleSystem* VFXToSpawn = nullptr;
+	if (CurrentColor == EColor::EC_None)
+	{
+		VFXToSpawn = DefaultPaintVFX;
+	}
+	else
+	{
+		if (TObjectPtr<UParticleSystem>* FoundVFX = ColorPaintVFX.Find(CurrentColor))
+		{
+			VFXToSpawn = *FoundVFX;
+		}
+	}
+	if (VFXToSpawn)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), VFXToSpawn, GetOwner()->GetActorLocation(), GetOwner()->GetActorRotation());
+	}
 
-	// 3. 更新“上一次”的颜色
+	// 3. 调用蓝图事件 (用于物理效果)
+	K2_OnColorEffectChanged(CurrentColor, PreviousColor);
+
+	// 4. 广播C++委托 (用于C++移动)
+	OnColorChanged.Broadcast(CurrentColor, PreviousColor);
+
+	// 5. 更新“上一次”的颜色
 	PreviousColor = CurrentColor;
 }
