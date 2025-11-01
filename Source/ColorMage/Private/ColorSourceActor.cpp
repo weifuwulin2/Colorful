@@ -1,40 +1,51 @@
+// ColorSourceActor.cpp
 #include "ColorSourceActor.h"
+#include "Components/SceneComponent.h" // [!! ADDED !!]
 #include "Components/StaticMeshComponent.h"
+#include "Components/BoxComponent.h"
 #include "ColorComponent.h"
-#include "NiagaraComponent.h" // <--- [!! ADDED !!]
+#include "NiagaraComponent.h"
 
 AColorSourceActor::AColorSourceActor()
 {
-	PrimaryActorTick.bCanEverTick = false; // Good for performance
-
-	// Create the MeshComponent first so it can be the Root
-	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
-	SetRootComponent(MeshComponent);
-	
-	// Create the NiagaraComponent
-	NiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraComponent"));
+    PrimaryActorTick.bCanEverTick = false;
+    // Create Root Scene Component first
+    RootSceneComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootScene"));
+    SetRootComponent(RootSceneComponent);
+    // Create MeshComponent and attach to root
+    MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
+    MeshComponent->SetupAttachment(RootSceneComponent);
     
-	// Attach the effect to the mesh.
-	// This makes it automatically move and scale WITH the mesh!
-	NiagaraComponent->SetupAttachment(MeshComponent); 
-	// --- [!! ADDED END !!] ---
-
-	// Apply the scale multiplier
-	if (NiagaraComponent)
-	{
-		// Set the effect's scale *relative* to its parent (the mesh).
-		// This combines with the mesh's scale.
-		// FVector(EffectScaleMultiplier) applies the float uniformly to X, Y, and Z.
-		NiagaraComponent->SetRelativeScale3D(FVector(EffectScaleMultiplier));
-	}
+    // Create Box Collision Component and attach to root
+    CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox"));
+    CollisionBox->SetupAttachment(RootSceneComponent);
+    CollisionBox->SetBoxExtent(CollisionBoxExtent);
+    
+    // [!! FIXED !!] 设置碰撞配置
+    CollisionBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly); // 只查询
+    CollisionBox->SetCollisionObjectType(ECC_WorldStatic);
+    CollisionBox->SetCollisionResponseToAllChannels(ECR_Overlap); // [!! CHANGED !!] 阻挡所有对象
+    
+    // Create NiagaraComponent and attach to mesh
+    NiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraComponent"));
+    NiagaraComponent->SetupAttachment(MeshComponent);
+    // Apply the scale multiplier
+    if (NiagaraComponent)
+    {
+        NiagaraComponent->SetRelativeScale3D(FVector(EffectScaleMultiplier));
+    }
 }
 
-// --- [!! ADDED !!] ---
-/** Called when the game starts */
 void AColorSourceActor::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
 
-	
+    // 同步碰撞盒大小
+    if (CollisionBox)
+    {
+        CollisionBox->SetBoxExtent(CollisionBoxExtent);
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("ColorSourceActor %s 已创建，提供颜色: %d"), 
+           *GetName(), (int32)ColorToProvide);
 }
-

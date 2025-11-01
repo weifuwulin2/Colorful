@@ -1,13 +1,15 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// ColorSourceActor.h
 #pragma once
 
 #include "CoreMinimal.h"
 #include "ColorTypes.h"
 #include "GameFramework/Actor.h"
 #include "ColorSourceActor.generated.h"
+
 class UColorComponent;
 class UNiagaraComponent;
+class UBoxComponent;
+class USceneComponent; // [!! ADDED !!]
 
 UCLASS()
 class COLORMAGE_API AColorSourceActor : public AActor
@@ -21,23 +23,30 @@ public:
 	EColor GetColorToProvide() const { return ColorToProvide; }
 
 protected:
-	/** Called when the game starts or when spawned */
-	virtual void BeginPlay() override; // <--- [!! ADDED !!]
+	virtual void BeginPlay() override;
 
-	protected:
+	// === 组件 ===
+	// [!! ADDED !!] Root Scene Component
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USceneComponent> RootSceneComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
 
-	// --- [!! ADDED !!] ---
-	/** The Niagara particle system component for the effect */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UBoxComponent> CollisionBox;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UNiagaraComponent> NiagaraComponent;
 
-	/** An extra multiplier to adjust the effect's scale relative to the mesh */
+	// === 配置 ===
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Effects")
 	float EffectScaleMultiplier = 1.0f;
-	// --- [!! ADDED END !!] ---
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic")
+	FVector CollisionBoxExtent = FVector(150.0f, 150.0f, 150.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
 	EColor ColorToProvide = EColor::EC_Red;
+	
 };
