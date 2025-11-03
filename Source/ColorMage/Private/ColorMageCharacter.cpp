@@ -1,4 +1,6 @@
 #include "ColorMageCharacter.h"
+
+#include "ColorMageGameMode.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -6,6 +8,7 @@
 #include "ColorProjectile.h"
 #include "EnhancedInputComponent.h"
 #include "Animation/AnimInstance.h"
+#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h" // 包含射线检测
 
 AColorMageCharacter::AColorMageCharacter()
@@ -106,11 +109,24 @@ void AColorMageCharacter::OnDash()
 {
 	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
 	if (!MoveComp || MoveComp->GravityScale != DefaultGravityScale) return;
+    
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (AnimInstance && DashMontage) { AnimInstance->Montage_Play(DashMontage); }
+	if (AnimInstance && DashMontage) 
+	{ 
+		AnimInstance->Montage_Play(DashMontage); 
+	}
+    
+	// [!! 修复 1 !!] 计算正确的冲刺速度
 	const float DashSpeed = DashDistance / DashDuration;
-	const FVector DashVelocity = GetActorForwardVector();
-	MoveComp->GravityScale = 0.0f; LaunchCharacter(DashVelocity, true, true);
+    
+	// [!! 修复 2 !!] 使用正确的冲刺向量和速度
+	const FVector DashVelocity = GetActorForwardVector() * DashSpeed; // 添加速度倍数
+    
+	MoveComp->GravityScale = 0.0f; 
+    
+	// [!! 修复 3 !!] 使用正确的 LaunchCharacter 参数
+	LaunchCharacter(DashVelocity, true, true); // XY 和 Z 都覆盖现有速度
+    
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DashFinished);
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle_DashFinished, this, &AColorMageCharacter::OnDashFinished, DashDuration, false);
 }
@@ -120,4 +136,40 @@ void AColorMageCharacter::OnDashFinished()
 	if (!MoveComp) return;
 	MoveComp->GravityScale = DefaultGravityScale;
 	MoveComp->StopMovementImmediately();
+}
+
+void AColorMageCharacter::FellOutOfWorld(const class UDamageType& dmgType)
+{
+	UE_LOG(LogTemp, Warning, TEXT("ColorMageCharacter %s 掉出世界!"), *GetName());
+
+	// 获取 GameMode
+	AGameModeBase* CurrentGameModeBase = UGameplayStatics::GetGameMode(this);
+	// 确保使用你正确的 GameMode 类名
+	AColorMageGameMode* MyGameMode = Cast<AColorMageGameMode>(CurrentGameModeBase); 
+
+	if (MyGameMode)
+	{
+		// 获取控制这个角色的 Controller
+		AController* MyController = GetController();
+		if (MyController)
+		{
+			// 调用 GameMode 的重生函数
+			MyGameMode->RespawnPlayer(MyController);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("FellOutOfWorld (Character): 无法获取 Controller 来重生!"));
+			// 备用方案：调用基类实现（销毁 Actor）
+			Super::FellOutOfWorld(dmgType);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("FellOutOfWorld (Character): 无法获取 AColorMageGameMode!"));
+		// 备用方案：调用基类实现（销毁 Actor）
+		Super::FellOutOfWorld(dmgType);
+	}
+
+	// 注意：我们不调用 Super::FellOutOfWorld(dmgType);
+	// 因为基类的默认实现是销毁 Actor，而我们想要重生。
 }

@@ -43,6 +43,8 @@ protected:
 
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	void OnUnpossess();
+	/** 当 Actor 被认为掉出世界时由引擎调用 */
+	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
 
 	bool bCanBePossessed = false;
 };

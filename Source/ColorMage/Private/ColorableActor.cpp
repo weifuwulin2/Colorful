@@ -1,10 +1,13 @@
 // ColorableActor.cpp
 #include "ColorableActor.h"
+
+#include "BurnableWoodActor.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/PointLightComponent.h"
 #include "ColorComponent.h"
+#include "ColorMageCharacter.h"
 #include "HiddenPathActor.h"
 #include "Engine/World.h"
 
@@ -101,81 +104,22 @@ void AColorableActor::Tick(float DeltaTime)
 void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
 {
     UE_LOG(LogTemp, Warning, TEXT("=== %s 颜色变化: %d -> %d ==="), *GetName(), (int32)OldColor, (int32)NewColor);
-
-    // 处理移动逻辑
-    if (NewColor == EColor::EC_White)
+    // [!! 修正 !!] 如果旧颜色是红色，清理火焰伤害计时器
+    if (OldColor == EColor::EC_Red)
     {
-        // 白色 → 上升
-        TargetLocation = HomeLocation + FVector(0.f, 0.f, MoveDistance);
-        bIsMovingAutomatically = true;
-        UE_LOG(LogTemp, Log, TEXT("%s: 白色 - 开始上升"), *GetName());
+        UE_LOG(LogTemp, Warning, TEXT("%s: 离开红色 - 停止火焰伤害"), *GetName());
+        GetWorld()->GetTimerManager().ClearTimer(FireDamageTimer);
+        BurningWoods.Empty();
     }
-    else if (NewColor == EColor::EC_Black)
+    // [!! 修正 !!] 如果旧颜色是黄色，清理光照
+    if (OldColor == EColor::EC_Yellow)
     {
-        // 黑色 → 下降
-        TargetLocation = HomeLocation - FVector(0.f, 0.f, MoveDistance);
-        bIsMovingAutomatically = true;
-        UE_LOG(LogTemp, Log, TEXT("%s: 黑色 - 开始下降"), *GetName());
-    }
-    else
-    {
-        // 其他颜色 → 回到原位
-        TargetLocation = HomeLocation;
-        bIsMovingAutomatically = true;
-    }
-
-    // 处理光照逻辑
-    if (NewColor == EColor::EC_Yellow)
-    {
-        // 黄色 → 发光并照亮隐藏物体
-        UE_LOG(LogTemp, Warning, TEXT("%s: 黄色 - 激活光照"), *GetName());
-        
-        if (PointLight)
-        {
-            PointLight->SetVisibility(true);
-        }
-
-        // 查找并显示隐藏路径
-        UWorld* World = GetWorld();
-        if (World)
-        {
-            TArray<FOverlapResult> OverlapResults;
-            FCollisionQueryParams QueryParams;
-            QueryParams.AddIgnoredActor(this);
-
-            bool bHasOverlaps = World->OverlapMultiByObjectType(
-                OverlapResults,
-                GetActorLocation(),
-                FQuat::Identity,
-                FCollisionObjectQueryParams(ECC_WorldStatic),
-                FCollisionShape::MakeSphere(LightRadius),
-                QueryParams
-            );
-
-            UE_LOG(LogTemp, Warning, TEXT("%s: 光照范围检测到 %d 个对象"), *GetName(), OverlapResults.Num());
-
-            for (const FOverlapResult& Result : OverlapResults)
-            {
-                if (AHiddenPathActor* Path = Cast<AHiddenPathActor>(Result.GetActor()))
-                {
-                    UE_LOG(LogTemp, Warning, TEXT("照亮隐藏路径: %s"), *Path->GetName());
-                    Path->Reveal();
-                    RevealedPaths.AddUnique(Path);
-                }
-            }
-        }
-    }
-    else if (OldColor == EColor::EC_Yellow)
-    {
-        // 从黄色变为其他颜色 → 关闭光照
-        UE_LOG(LogTemp, Warning, TEXT("%s: 关闭光照"), *GetName());
+        UE_LOG(LogTemp, Warning, TEXT("%s: 离开黄色 - 关闭光照"), *GetName());
         
         if (PointLight)
         {
             PointLight->SetVisibility(false);
         }
-
-        // 隐藏所有已显示的路径
         for (AHiddenPathActor* Path : RevealedPaths)
         {
             if (IsValid(Path))
@@ -185,8 +129,134 @@ void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
         }
         RevealedPaths.Empty();
     }
+    // 处理移动逻辑
+    if (NewColor == EColor::EC_White)
+    {
+        TargetLocation = HomeLocation + FVector(0.f, 0.f, MoveDistance);
+        bIsMovingAutomatically = true;
+        UE_LOG(LogTemp, Log, TEXT("%s: 白色 - 开始上升"), *GetName());
+    }
+    else if (NewColor == EColor::EC_Black)
+    {
+        TargetLocation = HomeLocation - FVector(0.f, 0.f, MoveDistance);
+        bIsMovingAutomatically = true;
+        UE_LOG(LogTemp, Log, TEXT("%s: 黑色 - 开始下降"), *GetName());
+    }
+    else
+    {
+        TargetLocation = HomeLocation;
+        bIsMovingAutomatically = true;
+    }
+    // 处理光照逻辑（黄色）
+    if (NewColor == EColor::EC_Yellow)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: 进入黄色 - 激活光照"), *GetName());
+        
+        if (PointLight)
+        {
+            PointLight->SetVisibility(true);
+        }
+        UWorld* World = GetWorld();
+        if (World)
+        {
+            TArray<FOverlapResult> OverlapResults;
+            FCollisionQueryParams QueryParams;
+            QueryParams.AddIgnoredActor(this);
+            bool bHasOverlaps = World->OverlapMultiByObjectType(
+                OverlapResults,
+                GetActorLocation(),
+                FQuat::Identity,
+                FCollisionObjectQueryParams(ECC_WorldStatic),
+                FCollisionShape::MakeSphere(LightRadius),
+                QueryParams
+            );
+            for (const FOverlapResult& Result : OverlapResults)
+            {
+                if (AHiddenPathActor* Path = Cast<AHiddenPathActor>(Result.GetActor()))
+                {
+                    Path->Reveal();
+                    RevealedPaths.AddUnique(Path);
+                }
+            }
+        }
+    }
+    // 处理燃烧逻辑（红色）
+    if (NewColor == EColor::EC_Red)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: 进入红色 - 激活燃烧和火焰伤害"), *GetName());
+        // 点燃附近的木头
+        UWorld* World = GetWorld();
+        if (World)
+        {
+            TArray<FOverlapResult> OverlapResults;
+            FCollisionQueryParams QueryParams;
+            QueryParams.AddIgnoredActor(this);
+            bool bHasOverlaps = World->OverlapMultiByObjectType(
+                OverlapResults,
+                GetActorLocation(),
+                FQuat::Identity,
+                FCollisionObjectQueryParams(ECC_WorldStatic),
+                FCollisionShape::MakeSphere(LightRadius),
+                QueryParams
+            );
+            for (const FOverlapResult& Result : OverlapResults)
+            {
+                if (ABurnableWoodActor* Wood = Cast<ABurnableWoodActor>(Result.GetActor()))
+                {
+                    if (!Wood->IsBurning())
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("点燃木头: %s"), *Wood->GetName());
+                        Wood->StartBurning();
+                        BurningWoods.AddUnique(Wood);
+                    }
+                }
+            }
+        }
+        // 开始对玩家造成火焰伤害
+        GetWorld()->GetTimerManager().SetTimer(
+            FireDamageTimer,
+            this,
+            &AColorableActor::DealFireDamageToPlayer,
+            FireDamageInterval,
+            true // 重复执行
+        );
+    }
 }
-
+// [!! 新增 !!] 火焰伤害函数
+void AColorableActor::DealFireDamageToPlayer()
+{
+    UWorld* World = GetWorld();
+    if (!World) return;
+    // 检测范围内的玩家
+    TArray<FOverlapResult> OverlapResults;
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(this);
+    bool bHasOverlaps = World->OverlapMultiByObjectType(
+        OverlapResults,
+        GetActorLocation(),
+        FQuat::Identity,
+        FCollisionObjectQueryParams(ECC_Pawn), // 检测玩家
+        FCollisionShape::MakeSphere(LightRadius), // 使用灯光范围作为火焰伤害范围
+        QueryParams
+    );
+    for (const FOverlapResult& Result : OverlapResults)
+    {
+        if (AColorMageCharacter* Player = Cast<AColorMageCharacter>(Result.GetActor()))
+        {
+            UE_LOG(LogTemp, Error, TEXT("玩家 %s 被红色ColorableActor烧伤！"), *Player->GetName());
+            
+            // 杀死玩家或造成伤害
+            // 临时方案：将玩家传送到上方（模拟死亡重生）
+            FVector RespawnLocation = Player->GetActorLocation() + FVector(0, 0, 1000);
+            Player->SetActorLocation(RespawnLocation);
+            
+            UE_LOG(LogTemp, Warning, TEXT("玩家因红色火焰死亡，重生到: %s"), *RespawnLocation.ToString());
+            
+            // 你也可以实现更复杂的死亡/重生逻辑
+            // 比如调用游戏模式的重生函数，播放死亡动画等
+        }
+    }
+}
 EColor AColorableActor::GetColor() const
 {
     return ColorComponent ? ColorComponent->GetColor() : EColor::EC_None;

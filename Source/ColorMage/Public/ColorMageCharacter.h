@@ -77,6 +77,8 @@ protected:
 	// --- Input Handlers ---
 	void OnDash();
 	void OnDashFinished();
+	/** 当 Actor 被认为掉出世界时由引擎调用 */
+	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
 	void OnFireProjectile();
 	// [!! 已移除 !!] OnAimStarted, OnAimCompleted
 };
