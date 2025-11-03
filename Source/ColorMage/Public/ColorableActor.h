@@ -64,25 +64,35 @@ protected:
     // [!! 添加这些变量 !!] 火焰相关
     UPROPERTY()
     TArray<TObjectPtr<ABurnableWoodActor>> BurningWoods;
-private:
+
     // 颜色改变处理
     UFUNCTION()
-    void HandleColorChange(EColor NewColor, EColor OldColor);
-   
+    virtual void HandleColorChange(EColor NewColor, EColor OldColor);
+
     // === 移动相关 ===
     FVector HomeLocation;
     FVector TargetLocation;
     bool bIsMovingAutomatically = false;
+    bool bIsScalingAutomatically = false;
 
+    FVector HomeScale;
+    FVector TargetScale;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scale", meta = (AllowPrivateAccess = "true"))
+    float ScaleSpeed = 2.0f;
+    
     // === 光照相关 ===
     UPROPERTY()
     TArray<TObjectPtr<AHiddenPathActor>> RevealedPaths;
     
     // [!! 新增 !!] 红色火焰伤害
     FTimerHandle FireDamageTimer;
-    
+
+public:
     UFUNCTION()
     void DealFireDamageToPlayer();
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fire", meta = (AllowPrivateAccess = "true"))
     float FireDamageInterval = 0.5f;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scale", meta = (AllowPrivateAccess = "true"))
+    FVector2D StretchAmount = FVector2D(2.0f, 2.0f); // X和Y轴的拉伸倍数
 };

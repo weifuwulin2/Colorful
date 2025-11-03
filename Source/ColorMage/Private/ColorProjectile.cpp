@@ -16,8 +16,8 @@ AColorProjectile::AColorProjectile()
 	if (ProjectileMovementComponent)
 	{
 		ProjectileMovementComponent->UpdatedComponent = CollisionComponent;
-		ProjectileMovementComponent->InitialSpeed = 3000.0f;
-		ProjectileMovementComponent->MaxSpeed = 3000.0f;
+		ProjectileMovementComponent->InitialSpeed = 9000.0f;
+		ProjectileMovementComponent->MaxSpeed = 9000.0f;
 		ProjectileMovementComponent->bRotationFollowsVelocity = true;
 		ProjectileMovementComponent->bShouldBounce = false;
 		ProjectileMovementComponent->ProjectileGravityScale = 0.0f;

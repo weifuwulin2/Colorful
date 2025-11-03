@@ -46,7 +46,9 @@ void AColorableActor::BeginPlay()
     // 存储起始位置
     HomeLocation = GetActorLocation();
     TargetLocation = HomeLocation;
-
+    
+    HomeScale = GetActorScale3D();
+    TargetScale = HomeScale;
     // 绑定颜色改变事件
     if (ColorComponent)
     {
@@ -99,11 +101,37 @@ void AColorableActor::Tick(float DeltaTime)
             SetActorLocation(NewLocation, true);
         }
     }
+
+    // [!! 新增 !!] 平滑缩放逻辑
+    if (bIsScalingAutomatically)
+    {
+        FVector CurrentScale = GetActorScale3D();
+        
+        if (CurrentScale.Equals(TargetScale, 0.01f))
+        {
+            // 到达目标缩放
+            bIsScalingAutomatically = false;
+            SetActorScale3D(TargetScale);
+            UE_LOG(LogTemp, Log, TEXT("%s 到达目标缩放 %s"), *GetName(), *TargetScale.ToString());
+        }
+        else
+        {
+            // 插值缩放
+            FVector NewScale = FMath::VInterpTo(
+                CurrentScale,
+                TargetScale,
+                DeltaTime,
+                ScaleSpeed
+            );
+            SetActorScale3D(NewScale);
+        }
+    }
 }
 
 void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
 {
     UE_LOG(LogTemp, Warning, TEXT("=== %s 颜色变化: %d -> %d ==="), *GetName(), (int32)OldColor, (int32)NewColor);
+    
     // [!! 修正 !!] 如果旧颜色是红色，清理火焰伤害计时器
     if (OldColor == EColor::EC_Red)
     {
@@ -111,6 +139,7 @@ void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
         GetWorld()->GetTimerManager().ClearTimer(FireDamageTimer);
         BurningWoods.Empty();
     }
+    
     // [!! 修正 !!] 如果旧颜色是黄色，清理光照
     if (OldColor == EColor::EC_Yellow)
     {
@@ -129,6 +158,15 @@ void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
         }
         RevealedPaths.Empty();
     }
+
+    // [!! 新增 !!] 如果旧颜色是绿色，恢复原始缩放
+    if (OldColor == EColor::EC_Green)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: 离开绿色 - 恢复原始缩放"), *GetName());
+        TargetScale = HomeScale;
+        bIsScalingAutomatically = true;
+    }
+
     // 处理移动逻辑
     if (NewColor == EColor::EC_White)
     {
@@ -147,6 +185,7 @@ void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
         TargetLocation = HomeLocation;
         bIsMovingAutomatically = true;
     }
+
     // 处理光照逻辑（黄色）
     if (NewColor == EColor::EC_Yellow)
     {
@@ -180,10 +219,30 @@ void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
             }
         }
     }
+
+    // [!! 新增 !!] 处理拉伸逻辑（绿色）
+    if (NewColor == EColor::EC_Green)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: 进入绿色 - 开始X/Y轴拉伸"), *GetName());
+        
+        // 计算拉伸后的缩放值（只拉伸X和Y轴，保持Z轴不变）
+        TargetScale = FVector(
+            HomeScale.X * StretchAmount.X,  // X轴拉伸
+            HomeScale.Y * StretchAmount.Y,  // Y轴拉伸
+            HomeScale.Z                     // Z轴保持不变
+        );
+        
+        bIsScalingAutomatically = true;
+        
+        UE_LOG(LogTemp, Log, TEXT("%s: 绿色拉伸 - 从 %s 到 %s"), 
+            *GetName(), *HomeScale.ToString(), *TargetScale.ToString());
+    }
+
     // 处理燃烧逻辑（红色）
     if (NewColor == EColor::EC_Red)
     {
         UE_LOG(LogTemp, Warning, TEXT("%s: 进入红色 - 激活燃烧和火焰伤害"), *GetName());
+        
         // 点燃附近的木头
         UWorld* World = GetWorld();
         if (World)
@@ -212,16 +271,18 @@ void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
                 }
             }
         }
+        
         // 开始对玩家造成火焰伤害
         GetWorld()->GetTimerManager().SetTimer(
             FireDamageTimer,
             this,
             &AColorableActor::DealFireDamageToPlayer,
             FireDamageInterval,
-            true // 重复执行
+            true
         );
     }
 }
+
 // [!! 新增 !!] 火焰伤害函数
 void AColorableActor::DealFireDamageToPlayer()
 {
