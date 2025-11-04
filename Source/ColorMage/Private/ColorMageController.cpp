@@ -78,29 +78,18 @@ void AColorMageController::HandleLook(const FInputActionValue& Value)
 /** (RMB) 处理汲取/混合请求 */
 void AColorMageController::OnAcquire()
 {
-	FVector CamLoc; FRotator CamRot;
-	GetPlayerViewPoint(CamLoc, CamRot);
-	FVector TraceStart = CamLoc;
-	FVector TraceEnd = TraceStart + (CamRot.Vector() * InteractionDistance);
-	TArray<AActor*> ActorsToIgnore;
-	APawn* MyPawn = GetPawn(); if (MyPawn) { ActorsToIgnore.Add(MyPawn); }
-	FHitResult HitResult;
-	bool bHit = UKismetSystemLibrary::LineTraceSingle(
-		this, TraceStart, TraceEnd, ETraceTypeQuery::TraceTypeQuery1,
-		false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true
-	);
+	AColorMageCharacter* MyCharacter = Cast<AColorMageCharacter>(GetPawn());
 
-	if (bHit && HitResult.GetActor())
+	// 2. 检查它是否是我们的法师角色 (平台/生物不能汲取颜色)
+	if (MyCharacter)
 	{
-		AColorSourceActor* Source = Cast<AColorSourceActor>(HitResult.GetActor());
-		if (Source)
-		{
-			UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
-			if (ColorManager)
-			{
-				ColorManager->HandleAcquireColor(this, Source);
-			}
-		}
+		// 3. 告诉角色去执行“汲取”动作（播放动画并设置计时器）
+		MyCharacter->RequestAcquireColor();
+	}
+	else
+	{
+		// (如果正附身在平台上按 RMB，什么也不做)
+		UE_LOG(LogTemp, Log, TEXT("OnAcquire: 只有法师角色才能汲取颜色。"));
 	}
 }
 

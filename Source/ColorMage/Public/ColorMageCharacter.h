@@ -24,7 +24,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "UI")
 	EPawnControlType GetControlType() const { return ControlType; }
-
+	void RequestAcquireColor();
 protected:
 	// --- [!! GDD 修正：输入 !!] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
@@ -60,6 +60,26 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	EPawnControlType ControlType = EPawnControlType::Character;
 
+	/** 玩家按下“射击”时播放的动画蒙太奇 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+	TObjectPtr<UAnimMontage> FireProjectileMontage;
+
+	/** 播放蒙太奇后，延迟多少秒才真正发射投射物 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+	float ProjectileSpawnDelay = 0.3f; // 0.3秒
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+	TObjectPtr<UAnimMontage> AcquireColorMontage;
+
+	/** 播放蒙太奇后，延迟多少秒才真正执行射线检测 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+	float AcquireColorDelay = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+	float HipFireRotationDuration = 0.5f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
+	float AcquireRotationDuration = 0.4f;
 private:
 	// --- [!! GDD 修正：已清理 !!] ---
 	TObjectPtr<USpringArmComponent> CameraSpringArm;
@@ -68,7 +88,10 @@ private:
 	// [!! 已移除 !!] bIsManuallyAiming, bIsLerpingRotation, TargetRotation, TimerHandle_AutoAimReset
 	// [!! 已移除 !!] TargetArmLength, TargetSocketOffset
 	// --- [!! GDD 修正结束 !!] ---
-
+	FTimerHandle TimerHandle_SpawnProjectile;
+	FTimerHandle TimerHandle_AcquireColor;
+	FTimerHandle TimerHandle_ResetFireRotation;
+	FTimerHandle TimerHandle_ResetAcquireRotation;
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -79,6 +102,10 @@ protected:
 	void OnDashFinished();
 	/** 当 Actor 被认为掉出世界时由引擎调用 */
 	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
+	
 	void OnFireProjectile();
-	// [!! 已移除 !!] OnAimStarted, OnAimCompleted
+	void SpawnProjectile_Internal();
+	void AcquireColor_Internal();
+	void SetAimRotation(bool bLockRotationToCamera);
+	void ResetActionState();
 };
