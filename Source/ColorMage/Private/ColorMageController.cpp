@@ -20,11 +20,20 @@ void AColorMageController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 只在控制角色时才需要更新准星
-	if (!Cast<AColorMageCharacter>(GetPawn()))
+	// 1. 检查是否在控制角色
+	AColorMageCharacter* MyCharacter = Cast<AColorMageCharacter>(GetPawn());
+	if (!MyCharacter)
 	{
-		// 如果不在控制角色 (比如在附身平台)，
-		// 确保准星变回 "None" 状态
+		// [!! 清理状态 !!] 如果不在控制角色 (比如在附身平台)
+		
+		// 1a. 清除高亮
+		if (CurrentHighlightedActor.IsValid() && CurrentHighlightedActor->Implements<UHighlightableInterface>())
+		{
+			IHighlightableInterface::Execute_OnUnhighlight(CurrentHighlightedActor.Get());
+		}
+		CurrentHighlightedActor = nullptr;
+
+		// 1b. 清除准星
 		if (CurrentTargetType != EReticleTargetType::None)
 		{
 			CurrentTargetType = EReticleTargetType::None;
@@ -33,61 +42,78 @@ void AColorMageController::Tick(float DeltaTime)
 		return;
 	}
 
-	// 1. 设置射线
-	FVector CameraLocation;
-	FRotator CameraRotation;
+	// 2. 设置射线
+	FVector CameraLocation; FRotator CameraRotation;
 	GetPlayerViewPoint(CameraLocation, CameraRotation);
 	FVector TraceStart = CameraLocation;
-	// [!! 注意 !!] 我们使用一个合理的交互距离，而不是 10000 (射击距离)
-	// 否则你可能会瞄准到 100 米外的花
-	float ReticleTraceDistance = 15500.0f; // 20 米 (你可以在.h设为UPROPERTY)
 	FVector TraceEnd = TraceStart + (CameraRotation.Vector() * ReticleTraceDistance);
-
 	FHitResult HitResult;
 	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(GetPawn()); // 忽略玩家自己
+	QueryParams.AddIgnoredActor(GetPawn()); 
 
 	EReticleTargetType NewTargetType = EReticleTargetType::None; // 默认为 "无"
+	AActor* NewHitActor = nullptr; // 存储当前帧命中的 Actor
 
-	// 2. 执行射线检测
+	// 3. 执行射线检测
 	if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
 	{
 		AActor* HitActor = HitResult.GetActor();
 		if (HitActor)
 		{
-			// 3. 分析击中的物体 (优先级从高到低)
-
-			// 检查 1: 是否为可附身物体 (PossessablePawn)？
-			if (APossessablePawn* PossPawn = Cast<APossessablePawn>(HitActor))
+			// --- [!! 逻辑 A: 更新准星 UI (EReticleTargetType) !!] ---
+			// (这是你粘贴的逻辑，但基于 No. 40 修复了)
+			if (HitActor->IsA<AColorSourceActor>())
+			{
+				NewTargetType = EReticleTargetType::Extractable;
+			}
+			else if (APossessablePawn* PossPawn = Cast<APossessablePawn>(HitActor))
 			{
 				AColorMagePlayerState* PS = GetPlayerState<AColorMagePlayerState>();
 				if (PS && PS->GetCurrentColor() != EColor::EC_None && PS->GetCurrentColor() == PossPawn->GetColor())
 				{
-					// 颜色匹配！最高优先级：可附身
 					NewTargetType = EReticleTargetType::Possessable;
 				}
 			}
-			// 检查 2: 是否为可上色的环境物体 (ColorableActor)？
 			else if (AColorableActor* ColorActor = Cast<AColorableActor>(HitActor))
 			{
-				// 它是灰色的，“可上色”
 				NewTargetType = EReticleTargetType::Paintable;
 			}
-			// 检查 3: 是否为颜色源 (ColorSourceActor)？
-			else if (AColorSourceActor* SourceActor = Cast<AColorSourceActor>(HitActor))
-			{
-				// “可汲取”
-				NewTargetType = EReticleTargetType::Extractable;
-			}
 			// (如果击中了其他东西，保持 NewTargetType = EReticleTargetType::None)
+
+			// --- [!! 逻辑 B: 更新轮廓高亮 (IHighlightableInterface) !!] ---
+			if (HitActor->Implements<UHighlightableInterface>())
+			{
+				// 这个 Actor 可以被高亮
+				NewHitActor = HitActor;
+			}
 		}
 	}
+	// (如果射线什么也没打中, NewTargetType = None, NewHitActor = nullptr)
 
-	// 4. [!! 关键 !!] 仅在状态 *改变* 时才广播委托
+	// 4. 广播准星 UI 更新 (仅当状态改变时)
 	if (NewTargetType != CurrentTargetType)
 	{
 		CurrentTargetType = NewTargetType;
 		OnReticleTargetChanged.Broadcast(CurrentTargetType);
+	}
+
+	// 5. 调用高亮回调 (仅当 Actor 改变时)
+	if (NewHitActor != CurrentHighlightedActor.Get())
+	{
+		// 取消高亮“旧”的 Actor
+		if (CurrentHighlightedActor.IsValid() && CurrentHighlightedActor->Implements<UHighlightableInterface>())
+		{
+			IHighlightableInterface::Execute_OnUnhighlight(CurrentHighlightedActor.Get());
+		}
+
+		// 高亮“新”的 Actor
+		if (NewHitActor) // (我们已经知道它实现了接口)
+		{
+			IHighlightableInterface::Execute_OnHighlight(NewHitActor);
+		}
+
+		// 更新“当前”高亮的 Actor
+		CurrentHighlightedActor = NewHitActor;
 	}
 }
 void AColorMageController::OnPossess(APawn* InPawn)

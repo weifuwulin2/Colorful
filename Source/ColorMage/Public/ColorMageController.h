@@ -62,7 +62,8 @@ protected:
 	TObjectPtr<UInputAction> AcquireAction; 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> PossessAction;
-	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
+	float ReticleTraceDistance = 15500.0f;
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
@@ -82,4 +83,7 @@ private:
 
 	UPROPERTY()
 	EReticleTargetType CurrentTargetType = EReticleTargetType::None;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> CurrentHighlightedActor = nullptr;
 };

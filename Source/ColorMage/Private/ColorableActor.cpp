@@ -283,6 +283,16 @@ void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
     }
 }
 
+void AColorableActor::OnHighlight_Implementation()
+{
+    IHighlightableInterface::OnHighlight_Implementation();
+}
+
+void AColorableActor::OnUnhighlight_Implementation()
+{
+    IHighlightableInterface::OnUnhighlight_Implementation();
+}
+
 // [!! 新增 !!] 火焰伤害函数
 void AColorableActor::DealFireDamageToPlayer()
 {

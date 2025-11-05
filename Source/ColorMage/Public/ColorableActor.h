@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "HighlightableInterface.h"
 #include "GameFramework/Actor.h"
 #include "ColorableActor.generated.h"
 
@@ -14,7 +15,7 @@ class UPointLightComponent;
 class AHiddenPathActor;
 
 UCLASS()
-class COLORMAGE_API AColorableActor : public AActor
+class COLORMAGE_API AColorableActor : public AActor, public IHighlightableInterface
 {
     GENERATED_BODY()
     
@@ -87,6 +88,9 @@ protected:
     // [!! 新增 !!] 红色火焰伤害
     FTimerHandle FireDamageTimer;
 
+    // --- [!! 3. 声明回调函数的 C++ 实现 !!] ---
+    virtual void OnHighlight_Implementation() override;
+    virtual void OnUnhighlight_Implementation() override;
 public:
     UFUNCTION()
     void DealFireDamageToPlayer();

@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "ColorTypes.h"
+#include "HighlightableInterface.h"
 #include "GameFramework/Actor.h"
 #include "ColorSourceActor.generated.h"
 
@@ -12,7 +13,7 @@ class UBoxComponent;
 class USceneComponent; // [!! ADDED !!]
 
 UCLASS()
-class COLORMAGE_API AColorSourceActor : public AActor
+class COLORMAGE_API AColorSourceActor : public AActor, public IHighlightableInterface
 {
 	GENERATED_BODY()
     
@@ -48,5 +49,8 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
 	EColor ColorToProvide = EColor::EC_Red;
-	
+
+	// --- [!! 3. 声明回调函数的 C++ 实现 !!] ---
+	virtual void OnHighlight_Implementation() override;
+	virtual void OnUnhighlight_Implementation() override;
 };

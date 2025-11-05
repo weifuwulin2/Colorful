@@ -1,0 +1,26 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.1.1",
+	"FriendlyName": "AdvancedOutlineSystem",
+	"Description": "AOS is Essential Code Plugin for Efficient Object Highlighting and Interaction Guidance.",
+	"Category": "Game",
+	"CreatedBy": "DevLevy",
+	"CreatedByURL": "https://docs.devlevy.com/",
+	"DocsURL": "https://docs.devlevy.com/ue-code-plugin/advanced-outline-system/documentation",
+	"MarketplaceURL": "https://www.fab.com/listings/2a52e58e-b295-4bbd-9295-94e886e2f017",
+	"SupportURL": "https://discord.com/invite/jcGWnsamn2",
+	"EngineVersion": "5.5.0",
+	"CanContainContent": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "AdvancedOutlineSystem",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64"
+			]
+		}
+	]
+}

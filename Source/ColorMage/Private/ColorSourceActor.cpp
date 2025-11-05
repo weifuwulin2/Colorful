@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "ColorComponent.h"
+#include "HighlightableInterface.h"
 #include "NiagaraComponent.h"
 
 AColorSourceActor::AColorSourceActor()
@@ -49,3 +50,14 @@ void AColorSourceActor::BeginPlay()
     UE_LOG(LogTemp, Log, TEXT("ColorSourceActor %s 已创建，提供颜色: %d"), 
            *GetName(), (int32)ColorToProvide);
 }
+
+void AColorSourceActor::OnHighlight_Implementation()
+{
+    
+}
+
+void AColorSourceActor::OnUnhighlight_Implementation()
+{
+    
+}
+

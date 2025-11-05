@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "ColorTypes.h"
+#include "HighlightableInterface.h"
 #include "InputAction.h"
 #include "PawnControlType.h"
 #include "GameFramework/Pawn.h"
@@ -11,7 +12,7 @@
 
 class UColorComponent; 
 UCLASS()
-class COLORMAGE_API APossessablePawn : public APawn
+class COLORMAGE_API APossessablePawn : public APawn, public IHighlightableInterface
 {
 	GENERATED_BODY()
 public:
@@ -47,4 +48,7 @@ protected:
 	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
 
 	bool bCanBePossessed = false;
+
+	virtual void OnHighlight_Implementation() override;
+	virtual void OnUnhighlight_Implementation() override;
 };

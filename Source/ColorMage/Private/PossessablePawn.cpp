@@ -101,3 +101,13 @@ void APossessablePawn::FellOutOfWorld(const class UDamageType& dmgType)
 	}
 }
 
+void APossessablePawn::OnHighlight_Implementation()
+{
+	IHighlightableInterface::OnHighlight_Implementation();
+}
+
+void APossessablePawn::OnUnhighlight_Implementation()
+{
+	IHighlightableInterface::OnUnhighlight_Implementation();
+}
+
