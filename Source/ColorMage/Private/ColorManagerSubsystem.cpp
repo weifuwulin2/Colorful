@@ -16,11 +16,31 @@ void UColorManagerSubsystem::HandleAcquireColor(APlayerController* Player, AColo
 	EColor PlayerColor = PlayerState->GetCurrentColor();
 	EColor SourceColor = ColorSource->GetColorToProvide(); 
 
-	// 1. 计算新颜色
-	EColor NewColor = GetMixedColor(PlayerColor, SourceColor);
+	EColor NewColor;
 
-	// 2. 设置新颜色
+	// --- [!! 关键检查 !!] ---
+	// 检查玩家是否已解锁混色能力
+	if (PlayerState->CanMixColors())
+	{
+		// 1. (已解锁) 玩家在第二关 -> 执行复杂的混合逻辑
+		NewColor = GetMixedColor(PlayerColor, SourceColor);
+	}
+	else
+	{
+		// 2. (未解锁) 玩家在第一关 -> 逻辑降级为“直接覆盖”
+		NewColor = SourceColor;
+	}
+	// --- [!! 检查结束 !!] ---
+
+	// 3. 设置新颜色
 	PlayerState->Server_SetCurrentColor(NewColor);
+	
+	UE_LOG(LogTemp, Log, TEXT("颜色汲取: 玩家 %s + 颜色源 %s = 玩家变为 %s (混色能力: %s)"), 
+		*UEnum::GetValueAsString(PlayerColor), 
+		*UEnum::GetValueAsString(SourceColor), 
+		*UEnum::GetValueAsString(NewColor),
+		PlayerState->CanMixColors() ? TEXT("已启用") : TEXT("已禁用")
+	);
 }
 
 /** (F) 尝试附身 (保持不变) */

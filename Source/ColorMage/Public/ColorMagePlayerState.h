@@ -31,6 +31,13 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnPlayerColorChanged OnPlayerColorChanged;
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "Color Magic")
+	void Server_EnableColorMixing();
+
+	/** 检查玩家是否已解锁混色能力 */
+	UFUNCTION(BlueprintPure, Category = "Color Magic")
+	bool CanMixColors() const { return bCanMixColors; }
 	
 protected:
 	/** Replication notification function for when CurrentColor changes. */
@@ -41,6 +48,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_CurrentColor, Category = "Color Magic")
 	EColor CurrentColor = EColor::EC_None;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "Color Magic")
+	bool bCanMixColors = false;
+	
 	/** Required for network replication. */
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

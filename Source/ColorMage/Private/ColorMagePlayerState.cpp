@@ -26,6 +26,19 @@ void AColorMagePlayerState::Server_SetCurrentColor_Implementation(EColor NewColo
 	}
 }
 
+void AColorMagePlayerState::Server_EnableColorMixing_Implementation()
+{
+	if (bCanMixColors == false) // 仅在尚未解锁时执行
+		{
+		bCanMixColors = true;
+		UE_LOG(LogTemp, Warning, TEXT("玩家 %s 已解锁混色能力!"), *GetPlayerName());
+		
+		// (可选) 你可以在这里也添加一个 RepNotify
+		// OnRep_CanMixColors(); 
+		// 并广播一个“能力已解锁”的委托，让 UI 播放特效
+		}
+}
+
 // This function executes on clients when the server updates CurrentColor
 void AColorMagePlayerState::OnRep_CurrentColor()
 {
