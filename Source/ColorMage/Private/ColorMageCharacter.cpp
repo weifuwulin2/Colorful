@@ -71,32 +71,49 @@ void AColorMageCharacter::PossessedBy(AController* NewController)
 
 // [!! 已移除 !!] SetAimRotation, SetAimZoom, OnAimStarted, OnAimCompleted, ResetHipFireRotation
 
+	// --- [!! 射击逻辑 - 已修改 !!] ---
 void AColorMageCharacter::OnFireProjectile()
 {
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (!AnimInstance) { UE_LOG(LogTemp, Error, TEXT("OnFireProjectile: AnimInstance 为空!")); return; }
-	if (!FireProjectileMontage) { UE_LOG(LogTemp, Error, TEXT("OnFireProjectile: FireProjectileMontage 未指定!")); return; }
 
-	// [!! 关键 !!] 检查是否已在播放 *任何* 动作
+	if (!AnimInstance) { /*...*/ return; }
+	if (!FireProjectileMontage) { /*...*/ return; }
+	if (!MoveComp) { /*...*/ return; } // [!! 新增 !!] 确保我们有移动组件
+
+	// 检查刷屏
 	if (AnimInstance->Montage_IsPlaying(FireProjectileMontage) || AnimInstance->Montage_IsPlaying(AcquireColorMontage))
 	{
 		UE_LOG(LogTemp, Log, TEXT("OnFireProjectile: 动作已在播放，阻止刷屏。"));
 		return;
 	}
 
-	// 1. 锁定移动
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	/*// --- [!! 关键修复 !!] ---
+	// 检查角色是否在地面上
+	if (MoveComp->IsMovingOnGround())
 	{
+		// 1. (在地面上) 锁定移动
+		UE_LOG(LogTemp, Log, TEXT("OnFireProjectile: 在地面上射击，锁定移动。"));
 		MoveComp->SetMovementMode(MOVE_None); 
 	}
+	else
+	{
+		// 2. (在空中) 不锁定移动 (重力会继续生效)
+		//    但我们可以暂时禁用 WASD 输入，防止空中“滑冰” (可选)
+		//    (或者保持空中控制 AirControl)
+		//    现在，我们暂时什么也不做，只让动画播放
+		UE_LOG(LogTemp, Log, TEXT("OnFireProjectile: 在空中射击，保持重力。"));
+	}
+	// --- [!! 修复结束 !!] ---*/
 
-	// 2. 立即将角色旋转锁定到摄像机方向
+	// 3. 锁定旋转 (这在空中和地面都应该执行)
 	SetAimRotation(true);
 
-	// 3. 播放“挥笔”动画
+	// 4. 播放“挥笔”动画
 	AnimInstance->Montage_Play(FireProjectileMontage);
+	UE_LOG(LogTemp, Log, TEXT("OnFireProjectile: 播放蒙太奇 %s"), *FireProjectileMontage->GetName());
 
-	// 4. 设置“发射”计时器
+	// 5. 设置“发射”计时器
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_SpawnProjectile);
 	GetWorld()->GetTimerManager().SetTimer(
 		TimerHandle_SpawnProjectile,
@@ -106,12 +123,12 @@ void AColorMageCharacter::OnFireProjectile()
 		false
 	);
 
-	// 5. 设置“重置旋转和移动”计时器
+	// 6. 设置“重置”计时器
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_ResetFireRotation);
 	GetWorld()->GetTimerManager().SetTimer(
 		TimerHandle_ResetFireRotation,
 		this,
-		&AColorMageCharacter::ResetActionState, // [!!] 调用共用的重置函数
+		&AColorMageCharacter::ResetActionState,
 		HipFireRotationDuration, 
 		false
 	);
@@ -270,31 +287,41 @@ void AColorMageCharacter::FellOutOfWorld(const class UDamageType& dmgType)
 
 void AColorMageCharacter::RequestAcquireColor()
 {
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (!AnimInstance) { UE_LOG(LogTemp, Error, TEXT("RequestAcquireColor: AnimInstance 为空!")); return; }
-	if (!AcquireColorMontage) { UE_LOG(LogTemp, Error, TEXT("RequestAcquireColor: AcquireColorMontage 未指定!")); return; }
+	if (!AnimInstance) { /*...*/ return; }
+	if (!AcquireColorMontage) { /*...*/ return; }
+	if (!MoveComp) { /*...*/ return; } // [!! 新增 !!]
 
-	// [!! 关键 !!] 检查是否已在播放 *任何* 动作
+	// 检查刷屏
 	if (AnimInstance->Montage_IsPlaying(AcquireColorMontage) || AnimInstance->Montage_IsPlaying(FireProjectileMontage))
 	{
 		UE_LOG(LogTemp, Log, TEXT("RequestAcquireColor: 动作已在播放，阻止刷屏。"));
 		return;
 	}
 
-	// --- [!! 新增逻辑：锁定 !!] ---
-	// 1. 锁定移动
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	/*// --- [!! 关键修复 !!] ---
+	// 检查角色是否在地面上
+	if (MoveComp->IsMovingOnGround())
 	{
+		// (在地面上) 锁定移动
+		UE_LOG(LogTemp, Log, TEXT("RequestAcquireColor: 在地面上汲取，锁定移动。"));
 		MoveComp->SetMovementMode(MOVE_None); 
 	}
-	// 2. 锁定旋转
-	SetAimRotation(true);
-	// --- [!! 逻辑结束 !!] ---
+	else
+	{
+		// (在空中) 不锁定移动
+		UE_LOG(LogTemp, Log, TEXT("RequestAcquireColor: 在空中汲取，保持重力。"));
+	}*/
+	// --- [!! 修复结束 !!] ---
 
-	// 3. 播放“汲取”动画
+	// 锁定旋转
+	SetAimRotation(true);
+
+	// 播放“汲取”动画
 	AnimInstance->Montage_Play(AcquireColorMontage);
 
-	// 4. 设置“汲取”计时器
+	// 设置“汲取”计时器
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AcquireColor);
 	GetWorld()->GetTimerManager().SetTimer(
 		TimerHandle_AcquireColor,
@@ -304,13 +331,13 @@ void AColorMageCharacter::RequestAcquireColor()
 		false
 	);
 
-	// 5. [!! 新增 !!] 设置“重置旋转和移动”计时器
+	// 设置“重置”计时器
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_ResetAcquireRotation);
 	GetWorld()->GetTimerManager().SetTimer(
 		TimerHandle_ResetAcquireRotation,
 		this,
-		&AColorMageCharacter::ResetActionState, // [!!] 调用共用的重置函数
-		AcquireRotationDuration, // 使用汲取专用的时长
+		&AColorMageCharacter::ResetActionState,
+		AcquireRotationDuration,
 		false
 	);
 }
