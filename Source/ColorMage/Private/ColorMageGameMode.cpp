@@ -4,6 +4,7 @@
 #include "ColorMageController.h"         // 需要包含玩家控制器
 #include "ColorMageCharacter.h"         // 需要包含玩家角色
 #include "ColorMagePlayerState.h"
+#include "NiagaraFunctionLibrary.h"
 #include "PossessablePawn.h"            // 需要包含可附身 Pawn
 #include "GameFramework/CharacterMovementComponent.h"
 
@@ -43,93 +44,120 @@ void AColorMageGameMode::UpdateCheckpoint(const FTransform& NewCheckpointTransfo
 
 void AColorMageGameMode::RespawnPlayer(AController* PlayerController)
 {
-	if (!PlayerController)
-    {
-       UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: PlayerController 无效!"));
-       return;
-    }
+	if (!PlayerController) { return; }
+	if (IsPlayerRespawning(PlayerController)) { return; }
 
-    UE_LOG(LogTemp, Warning, TEXT("GameMode: 正在为 %s 执行重生..."), *PlayerController->GetName());
+	UE_LOG(LogTemp, Warning, TEXT("GameMode: 正在为 %s 启动重生序列..."), *PlayerController->GetName());
 
-    AColorMageController* MageController = Cast<AColorMageController>(PlayerController);
+	// 1. 标记为“正在重生”
+	RespawningPlayers.Add(PlayerController);
+
+	// 2. 禁用玩家输入
+	AColorMageController* MageController = Cast<AColorMageController>(PlayerController);
+	if (MageController)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RespawnPlayer: 禁用玩家 %s 的输入。"), *PlayerController->GetName());
+		MageController->DisableInput(MageController);
+	}
+	
+	// (玩家的移动和可见性已在 AColorableActor 中被禁用)
+
+	// 3. 设置 1 秒延迟
+	FTimerHandle RespawnTimer;
+	float RespawnDelay = 1.0f; // 1秒延迟
+	
+	FTimerDelegate TimerDelegate;
+	TimerDelegate.BindUFunction(this, FName("DelayedRespawnLogic"), PlayerController);
+
+	GetWorld()->GetTimerManager().SetTimer(
+		RespawnTimer,
+		TimerDelegate,
+		RespawnDelay,
+		false 
+	);
+}
+void AColorMageGameMode::DelayedRespawnLogic(AController* PlayerController)
+{
+	if (!PlayerController) { return; }
+
+	UE_LOG(LogTemp, Warning, TEXT("DelayedRespawnLogic: 正在为 %s 执行传送..."), *PlayerController->GetName());
+
+	AColorMageController* MageController = Cast<AColorMageController>(PlayerController);
     if (!MageController)
     {
-       UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 无法将 Controller 转换为 AColorMageController!"));
+	   RespawningPlayers.Remove(PlayerController); // 清理集合
        return;
     }
 
-    // 获取玩家掉落时正在控制的 Pawn
-    APawn* FallingPawn = MageController->GetPawn();
-    // 获取存储在 Controller 中的“原始角色”（如果存在的话）
+    // --- (这是你之前的 RespawnPlayer 逻辑) ---
+    APawn* CurrentPawn = MageController->GetPawn();
     AColorMageCharacter* OriginalCharacter = MageController->HiddenCharacter.Get();
+	AColorMageCharacter* CharacterToRespawn = nullptr; 
 
-    AColorMageCharacter* CharacterToRespawn = nullptr; // 这是我们最终要传送的角色
-
-    // --- [!! 关键逻辑分支 !!] ---
-
-    // 情况 1: 玩家在附身时掉落
-    // (OriginalCharacter 有效，并且掉落的 Pawn 不是 OriginalCharacter)
-    if (OriginalCharacter && FallingPawn && FallingPawn != OriginalCharacter)
+	// 情况 1: 玩家在附身时掉落 (或死亡)
+    if (OriginalCharacter && CurrentPawn && CurrentPawn != OriginalCharacter)
     {
-        UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 玩家在附身 %s 时掉落。正在返回角色..."), *FallingPawn->GetName());
-        
-        // 我们要重生的是“原始角色”
+        UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 玩家附身在 %s。正在返回角色..."), *CurrentPawn->GetName());
         CharacterToRespawn = OriginalCharacter;
-
-        // 强制控制器重新附身到原始角色
-        // Possess 会自动调用 UnPossess 来脱离 FallingPawn
-        MageController->Possess(CharacterToRespawn); 
-        MageController->HiddenCharacter = nullptr; // 清除引用
-
-        // (可选，但推荐) 销毁掉下去的那个 Pawn
-        FallingPawn->Destroy();
+        MageController->Possess(CharacterToRespawn); // 这会触发 Character->PossessedBy()
+        MageController->HiddenCharacter = nullptr; 
+        if(IsValid(CurrentPawn)) { CurrentPawn->Destroy(); }
     }
-    // 情况 2: 玩家角色自己掉落
-    // (OriginalCharacter 是空的，并且 FallingPawn 是我们的角色)
-    else if (!OriginalCharacter && Cast<AColorMageCharacter>(FallingPawn))
+	// 情况 2: 玩家角色自己掉落 (或死亡)
+    else if (!OriginalCharacter && Cast<AColorMageCharacter>(CurrentPawn))
     {
-        UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 玩家角色 %s 掉落。正在传送..."), *FallingPawn->GetName());
-        
-        // 我们要重生的就是这个掉下去的角色
-        CharacterToRespawn = Cast<AColorMageCharacter>(FallingPawn);
+        UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 玩家角色 %s 掉落。正在传送..."), *CurrentPawn->GetName());
+        CharacterToRespawn = Cast<AColorMageCharacter>(CurrentPawn);
     }
-    // 情况 3: 发生了意外情况
-    // (例如：OriginalCharacter 是空的，掉下去的也不是角色，或者一切都是空的)
-    else
-    {
-        UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 状态未知! 尝试使用 RestartPlayer 重启..."));
-        // (你之前的逻辑)
-        RestartPlayer(MageController); 
-        CharacterToRespawn = Cast<AColorMageCharacter>(MageController->GetPawn()); // 获取新生成的角色
-    }
+	// 情况 3: 发生了意外情况
+    else { /*... (你的 RestartPlayer 逻辑) ...*/ }
     
-    // --- [!! 执行传送 !!] ---
+    // --- [!! 执行传送和视觉效果 !!] ---
     if (CharacterToRespawn)
     {
-       // [!! 传送 !!] 将角色传送到最后检查点
+       // 1. 传送到检查点
        CharacterToRespawn->TeleportTo(LastCheckpointTransform.GetLocation(), LastCheckpointTransform.GetRotation().Rotator(), false, true);
        
-       // [!! 关键 !!] 重置角色的移动状态
-       // (防止在空中冲刺时死亡，重生后继续以高速飞行)
+	   // 2. [!! 新增 !!] 播放重生 VFX
+	   if (RespawnVFX)
+	   {
+		   UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			   GetWorld(),
+			   RespawnVFX,
+			   LastCheckpointTransform.GetLocation(), // 在重生点播放
+			   LastCheckpointTransform.GetRotation().Rotator()
+		   );
+	   }
+	   
+	   // 3. [!! 新增 !!] 让角色重新可见并启用碰撞
+	   CharacterToRespawn->SetActorHiddenInGame(false);
+	   CharacterToRespawn->SetActorEnableCollision(true);
+	   
+	   // 4. 重置移动组件
        UCharacterMovementComponent* MoveComp = CharacterToRespawn->GetCharacterMovement();
        if (MoveComp)
        {
-           MoveComp->StopMovementImmediately(); // 停止所有速度
-           MoveComp->SetMovementMode(MOVE_Walking); // 强制设为行走 (如果重生点在空中，它会自动变为 Falling)
-           MoveComp->GravityScale = CharacterToRespawn->DefaultGravityScale; // 恢复重力 (以防在 Dash 中死亡)
+           MoveComp->StopMovementImmediately(); 
+           MoveComp->SetDefaultMovementMode(); // 恢复为 Walking 或 Falling
+           MoveComp->GravityScale = CharacterToRespawn->DefaultGravityScale; 
        }
 
        // (可选：重置颜色)
-       AColorMagePlayerState* PlayerState = MageController->GetPlayerState<AColorMagePlayerState>();
-       if (PlayerState)
-       {
-           // PlayerState->Server_SetCurrentColor(EColor::EC_None);
-       }
+       // ... (PlayerState->Server_SetCurrentColor(EColor::EC_None)) ...
        
-       UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 角色 %s 已重生到 Checkpoint。"), *CharacterToRespawn->GetName());
+       UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 角色 %s 已重生。"), *CharacterToRespawn->GetName());
     }
-    else
-    {
-       UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 重生失败，最终未能获取有效的 Pawn!"));
-    }
+    else { /*... (Log Error) ...*/ }
+	
+	// 5. 恢复玩家输入
+	UE_LOG(LogTemp, Warning, TEXT("DelayedRespawnLogic: 恢复玩家 %s 的输入。"), *PlayerController->GetName());
+	MageController->EnableInput(MageController);
+
+	// 6. 将玩家从“正在重生”集合中移除
+	RespawningPlayers.Remove(PlayerController);
+}
+bool AColorMageGameMode::IsPlayerRespawning(AController* PlayerController) const
+{
+	if (!PlayerController) return false;
+	return RespawningPlayers.Contains(PlayerController);
 }

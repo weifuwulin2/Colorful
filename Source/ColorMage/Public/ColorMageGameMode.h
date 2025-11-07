@@ -6,6 +6,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "ColorMageGameMode.generated.h"
 
+class UNiagaraSystem;
 /**
  * 
  */
@@ -31,11 +32,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Game Flow")
 	void RespawnPlayer(AController* PlayerController);
 
+	/** [!! 新增 !!] 检查玩家是否已在重生过程中 */
+	UFUNCTION(BlueprintPure, Category = "Game Flow")
+	bool IsPlayerRespawning(AController* PlayerController) const;
+	
 protected:
 	/** 游戏开始时调用 */
 	virtual void BeginPlay() override;
-
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Game Flow|Effects")
+	TObjectPtr<UNiagaraSystem> RespawnVFX;
+	
+	/** [!! 新增 !!] 1秒延迟后，真正执行重生逻辑的函数 */
+	UFUNCTION()
+	void DelayedRespawnLogic(AController* PlayerController);
 private:
 	/** 存储最后激活的 Checkpoint 的变换 */
-	FTransform LastCheckpointTransform;	
+	FTransform LastCheckpointTransform;
+
+	UPROPERTY()
+	TSet<TWeakObjectPtr<AController>> RespawningPlayers;
 };

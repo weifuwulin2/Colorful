@@ -253,3 +253,15 @@ void AColorMageController::RequestRepossessOriginalCharacter()
 	}
 	else { /* ... (Log Warning) ... */ }
 }
+
+void AColorMageController::EnableInput(APlayerController* PlayerController)
+{
+	Super::EnableInput(PlayerController);
+	
+	// 确保输入模式设置回“仅游戏”
+	bShowMouseCursor = false;
+	FInputModeGameOnly InputMode;
+	InputMode.SetConsumeCaptureMouseDown(true); 
+	SetInputMode(InputMode);
+	
+}

@@ -50,6 +50,7 @@ public:
 	TWeakObjectPtr<AColorMageCharacter> HiddenCharacter = nullptr;
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnReticleTargetChanged OnReticleTargetChanged;
+	virtual void EnableInput(APlayerController* PlayerController) override;
 protected:
 	// ... (Input Actions: DefaultInputMappingContext, MoveAction, LookAction, AcquireAction, PossessAction) ...
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")

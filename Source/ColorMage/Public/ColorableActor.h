@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "ColorableActor.generated.h"
 
+class UNiagaraSystem;
 class ABurnableWoodActor;
 class UColorComponent;
 class UStaticMeshComponent;
@@ -62,6 +63,8 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Light")
     float LightIntensity = 3000.0f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions|Fire")
+    TObjectPtr<UNiagaraSystem> FireDamageVFX;
     // [!! 添加这些变量 !!] 火焰相关
     UPROPERTY()
     TArray<TObjectPtr<ABurnableWoodActor>> BurningWoods;

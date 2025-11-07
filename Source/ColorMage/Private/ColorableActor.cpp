@@ -8,8 +8,12 @@
 #include "Components/PointLightComponent.h"
 #include "ColorComponent.h"
 #include "ColorMageCharacter.h"
+#include "ColorMageGameMode.h"
 #include "HiddenPathActor.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Engine/World.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 AColorableActor::AColorableActor()
 {
@@ -54,6 +58,7 @@ void AColorableActor::BeginPlay()
     {
         ColorComponent->OnColorChanged.AddDynamic(this, &AColorableActor::HandleColorChange);
         UE_LOG(LogTemp, Log, TEXT("ColorableActor %s: 颜色委托绑定成功"), *GetName());
+        HandleColorChange(ColorComponent->GetColor(), EColor::EC_None);
     }
     else
     {
@@ -131,6 +136,22 @@ void AColorableActor::Tick(float DeltaTime)
 void AColorableActor::HandleColorChange(EColor NewColor, EColor OldColor)
 {
     UE_LOG(LogTemp, Warning, TEXT("=== %s 颜色变化: %d -> %d ==="), *GetName(), (int32)OldColor, (int32)NewColor);
+
+    if (NewColor == EColor::EC_Red || NewColor == EColor::EC_Yellow)
+    {
+        // 设置为仅查询（允许被射线/子弹检测，但不阻挡物理）
+        MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        // 明确忽略 Pawn (玩家)，确保不会被卡住
+        MeshComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+        UE_LOG(LogTemp, Log, TEXT("%s: 颜色为红/黄，已禁用物理碰撞 (QueryOnly)"), *GetName());
+    }
+    else
+    {
+        // 其他颜色（白、黑、绿、灰）恢复正常物理碰撞
+        MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        MeshComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+        UE_LOG(LogTemp, Log, TEXT("%s: 颜色为其他，已恢复物理碰撞 (QueryAndPhysics)"), *GetName());
+    }
     
     // [!! 修正 !!] 如果旧颜色是红色，清理火焰伤害计时器
     if (OldColor == EColor::EC_Red)
@@ -296,35 +317,72 @@ void AColorableActor::OnUnhighlight_Implementation()
 // [!! 新增 !!] 火焰伤害函数
 void AColorableActor::DealFireDamageToPlayer()
 {
-    UWorld* World = GetWorld();
+  UWorld* World = GetWorld();
     if (!World) return;
-    // 检测范围内的玩家
+
+	// 1. 获取 GameMode
+	AColorMageGameMode* GameMode = Cast<AColorMageGameMode>(UGameplayStatics::GetGameMode(this));
+	if (!GameMode)
+	{
+		UE_LOG(LogTemp, Error, TEXT("DealFireDamageToPlayer: 无法获取 AColorMageGameMode!"));
+		return;
+	}
+
+    // 2. 检测范围内的玩家
     TArray<FOverlapResult> OverlapResults;
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(this);
     bool bHasOverlaps = World->OverlapMultiByObjectType(
-        OverlapResults,
-        GetActorLocation(),
-        FQuat::Identity,
-        FCollisionObjectQueryParams(ECC_Pawn), // 检测玩家
-        FCollisionShape::MakeSphere(LightRadius), // 使用灯光范围作为火焰伤害范围
+        OverlapResults, GetActorLocation(), FQuat::Identity,
+        FCollisionObjectQueryParams(ECC_Pawn),
+        FCollisionShape::MakeSphere(LightRadius),
         QueryParams
     );
+
+    // 3. 遍历所有重叠的 Pawn
     for (const FOverlapResult& Result : OverlapResults)
     {
         if (AColorMageCharacter* Player = Cast<AColorMageCharacter>(Result.GetActor()))
         {
+			AController* PlayerController = Player->GetController();
+			if (!PlayerController) continue;
+
+			// 检查 GameMode，看这个玩家是否“已经”在重生过程中
+			if (GameMode->IsPlayerRespawning(PlayerController))
+			{
+				continue; 
+			}
+
             UE_LOG(LogTemp, Error, TEXT("玩家 %s 被红色ColorableActor烧伤！"), *Player->GetName());
             
-            // 杀死玩家或造成伤害
-            // 临时方案：将玩家传送到上方（模拟死亡重生）
-            FVector RespawnLocation = Player->GetActorLocation() + FVector(0, 0, 1000);
-            Player->SetActorLocation(RespawnLocation);
+            // --- [!! 死亡效果开始 !!] ---
+
+            // 4. 播放燃烧 VFX (在玩家位置)
+            if (FireDamageVFX)
+            {
+                UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+                    World, FireDamageVFX, Player->GetActorLocation(), Player->GetActorRotation()
+                );
+            }
+
+			// 5. 立即冻结玩家
+			if (UCharacterMovementComponent* MoveComp = Player->GetCharacterMovement())
+			{
+				MoveComp->StopMovementImmediately();
+				MoveComp->SetMovementMode(MOVE_None); // 完全禁用移动
+			}
+			
+			// 6. [!! 新增 !!] 立即隐藏玩家
+			Player->SetActorHiddenInGame(true);
+			Player->SetActorEnableCollision(false); // 禁用碰撞
+			
+			// --- [!! 死亡效果结束 !!] ---
+
+			// 7. 调用 GameMode 的重生函数 (GameMode 将处理“禁用输入”和“延迟”)
+			GameMode->RespawnPlayer(PlayerController);
             
-            UE_LOG(LogTemp, Warning, TEXT("玩家因红色火焰死亡，重生到: %s"), *RespawnLocation.ToString());
-            
-            // 你也可以实现更复杂的死亡/重生逻辑
-            // 比如调用游戏模式的重生函数，播放死亡动画等
+			// 9. 既然已经处理了玩家，就跳出循环
+			break; 
         }
     }
 }
