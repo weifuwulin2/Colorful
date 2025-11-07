@@ -1,5 +1,6 @@
 #include "ColorComponent.h"
 
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInterface.h"
@@ -15,6 +16,7 @@ UColorComponent::UColorComponent()
 	DefaultColor = EColor::EC_None;
 	CurrentColor = DefaultColor;
 	PreviousColor = DefaultColor;
+	CurrentAmbientVFXComponent = nullptr;
 }
 
 void UColorComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -94,6 +96,36 @@ void UColorComponent::OnRep_CurrentColor()
 		}
 	}
 
+	if (CurrentAmbientVFXComponent)
+	{
+		// 销毁它
+		CurrentAmbientVFXComponent->DestroyComponent();
+		CurrentAmbientVFXComponent = nullptr;
+	}
+
+	// B. [!! 查找并附加新的VFX !!]
+	// 检查新颜色是否在我们的 TMap 中有对应的持续特效
+	if (CurrentColor != EColor::EC_None)
+	{
+		if (TObjectPtr<UNiagaraSystem>* FoundAmbientVFX = AmbientColorVFX.Find(CurrentColor))
+		{
+			if (*FoundAmbientVFX)
+			{
+				// [!! 关键 !!] 生成新的持续VFX
+				CurrentAmbientVFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+					*FoundAmbientVFX,                 // 你的 (火焰/光晕) 特效
+					MeshToControl,                    // 附加到网格体
+					NAME_None,
+					FVector(0.f),                     // 相对位置
+					FRotator(0.f),                    // 相对旋转
+					EAttachLocation::SnapToTarget,
+					false, // [!! 关键 !!] 自动销毁 (bAutoDestroy = false) - 它会一直播放
+					true   // 自动激活
+				);
+				UE_LOG(LogTemp, Log, TEXT("ColorComponent %s: 已附加持续VFX"), *GetOwner()->GetName());
+			}
+		}
+	}
 	// 3. 调用蓝图事件 (用于物理效果)
 	K2_OnColorEffectChanged(CurrentColor, PreviousColor);
 

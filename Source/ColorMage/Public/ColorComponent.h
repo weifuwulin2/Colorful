@@ -7,6 +7,7 @@
 #include "Components/ActorComponent.h"
 #include "ColorComponent.generated.h"
 
+class UNiagaraComponent;
 class UNiagaraSystem;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnColorChanged, EColor, NewColor, EColor, OldColor);
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -61,7 +62,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Effects")
 	TObjectPtr<UNiagaraSystem> DefaultPaintVFX;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Effects")
+	TMap<EColor, TObjectPtr<UNiagaraSystem>> AmbientColorVFX;
+
 private:
 	UPROPERTY()
 	EColor PreviousColor;
+	UPROPERTY()
+	TObjectPtr<UNiagaraComponent> CurrentAmbientVFXComponent;
 };
