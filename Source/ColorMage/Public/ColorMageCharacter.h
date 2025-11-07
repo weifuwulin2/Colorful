@@ -84,6 +84,34 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Effects")
 	TObjectPtr<UNiagaraSystem> AcquireColorVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visuals|Color")
+	TMap<EColor, FLinearColor> ColorMapping;
+
+	// --- 头发设置 (保持不变) ---
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visuals|Color")
+	int32 HairMaterialSlotIndex = 0; 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visuals|Color")
+	FName HairColorParameterName = "HairTint";
+
+	// --- 毛笔设置 (已修改) ---
+	/**
+	 * [!! 新增 !!]
+	 * 毛笔的静态网格体组件。我们将在 C++ 中创建它。
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaticMeshComponent> BrushMeshComponent;
+	
+	/** [!! 新增 !!] 毛笔附加到骨骼上的插槽名称 (例如 "Hand_R_Socket") */
+	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Color")
+	FName BrushAttachmentSocketName = "Hand_R_Socket"; // (请在编辑器中确认这个插槽名)
+	
+	/** [!! 已移除 !!] BrushTipMaterialSlotIndex 不再需要 */
+	// int32 BrushTipMaterialSlotIndex = 1; 
+
+	/** 材质中控制毛笔尖颜色的参数名称 (保持不变) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visuals|Color")
+	FName BrushTipColorParameterName = "BrushTipColor";
 private:
 	// --- [!! GDD 修正：已清理 !!] ---
 	TObjectPtr<USpringArmComponent> CameraSpringArm;
@@ -96,6 +124,11 @@ private:
 	FTimerHandle TimerHandle_AcquireColor;
 	FTimerHandle TimerHandle_ResetFireRotation;
 	FTimerHandle TimerHandle_ResetAcquireRotation;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HairDMI;
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> BrushTipDMI;
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -112,4 +145,7 @@ protected:
 	void AcquireColor_Internal();
 	void SetAimRotation(bool bLockRotationToCamera);
 	void ResetActionState();
+	
+	UFUNCTION()
+	void OnPlayerColorChanged(EColor NewColor);
 };

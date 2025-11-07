@@ -20,6 +20,20 @@ AColorMageCharacter::AColorMageCharacter()
 	PrimaryActorTick.bCanEverTick = false; 
 	DefaultGravityScale = 1.0f;
 	ControlType = EPawnControlType::Character; // 确保设置了类型
+
+	HairDMI = nullptr;
+	BrushTipDMI = nullptr;
+
+	// --- [!! GDD 修改：新增 !!] ---
+	// 1. 创建毛笔的静态网格体组件
+	BrushMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BrushMeshComponent"));
+	if (BrushMeshComponent)
+	{
+		// 2. 将它附加到角色的骨骼网格体 (GetMesh())
+		//BrushMeshComponent->SetupAttachment(GetMesh(), BrushAttachmentSocketName);
+		// 3. (重要!) 关闭毛笔自身的碰撞，防止它挡住玩家或射线
+		BrushMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 }
 
 void AColorMageCharacter::BeginPlay()
@@ -42,7 +56,47 @@ void AColorMageCharacter::BeginPlay()
 		CameraSpringArm->bEnableCameraLag = false;
 		CameraSpringArm->bEnableCameraRotationLag = false;
 	}
-	// --- [!! GDD 修正结束 !!] ---
+	
+	USkeletalMeshComponent* MyMesh = GetMesh();
+	if (MyMesh)
+	{
+		// 1. 创建头发的 DMI (来自骨骼网格体)
+		HairDMI = MyMesh->CreateDynamicMaterialInstance(0);
+		if (!HairDMI)
+		{
+			UE_LOG(LogTemp, Error, TEXT("%s: 无法在插槽 %d 上创建头发 DMI!"), *GetName(), HairMaterialSlotIndex);
+		}
+	}
+	else { /* Log Error */ }
+
+	// 2. [!! 修复 !!] 为毛笔网格体创建 DMI
+	if (BrushMeshComponent)
+	{
+		// 假设毛笔尖的材质在它自己的第 0 个插槽
+		BrushTipDMI = BrushMeshComponent->CreateDynamicMaterialInstance(1); 
+		if (!BrushTipDMI)
+		{
+			UE_LOG(LogTemp, Error, TEXT("%s: 无法在 BrushMeshComponent 上创建毛笔尖 DMI! (插槽 0)"), *GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s: 找不到 BrushMeshComponent!"), *GetName());
+	}
+	if (BrushMeshComponent)
+	{
+		// [!! 关键 !!] 使用 FAttachmentTransformRules::SnapToTarget 确保它正确对齐
+		BrushMeshComponent->AttachToComponent(
+			GetMesh(), 
+			FAttachmentTransformRules::SnapToTargetIncludingScale, 
+			BrushAttachmentSocketName // 现在这个变量有正确的值 (例如 "Hand_R_Socket")
+		);
+		UE_LOG(LogTemp, Warning, TEXT("毛笔已附加到插槽: %s"), *BrushAttachmentSocketName.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s: 找不到 BrushMeshComponent!"), *GetName());
+	}
 }
 
 // [!! 已移除 !!] Tick 函数已被移除
@@ -68,6 +122,20 @@ void AColorMageCharacter::PossessedBy(AController* NewController)
 	SetActorEnableCollision(true); 
 	SetActorTickEnabled(false); // 角色不需要 Tick
 	UE_LOG(LogTemp, Log, TEXT("ColorMageCharacter %s 已被重新附身并取消隐藏。"), *GetName());
+
+	AColorMagePlayerState* PS = GetPlayerState<AColorMagePlayerState>();
+	if (PS)
+	{
+		// 2. 绑定委托：当 PlayerState->OnPlayerColorChanged 广播时，调用 this->OnPlayerColorChanged
+		PS->OnPlayerColorChanged.AddDynamic(this, &AColorMageCharacter::OnPlayerColorChanged);
+
+		// 3. 立即调用一次，以同步游戏开始时的初始颜色
+		OnPlayerColorChanged(PS->GetCurrentColor());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s 在 PossessedBy 时无法获取 AColorMagePlayerState!"), *GetName());
+	}
 }
 
 // [!! 已移除 !!] SetAimRotation, SetAimZoom, OnAimStarted, OnAimCompleted, ResetHipFireRotation
@@ -496,4 +564,39 @@ void AColorMageCharacter::ResetActionState()
 	{
 		MoveComp->SetDefaultMovementMode(); 
 	}
+}
+
+void AColorMageCharacter::OnPlayerColorChanged(EColor NewColor)
+{
+	UE_LOG(LogTemp, Warning, TEXT("%s: OnPlayerColorChanged 触发! 新颜色: %d"), *GetName(), (int32)NewColor);
+
+	// 1. 在我们的 TMap 中查找对应的 FLinearColor
+	FLinearColor* ColorToApply = ColorMapping.Find(NewColor);
+
+	// 2. 如果没找到 (比如 TMap 中没有 EC_None 的条目)，设置一个备用颜色
+	if (!ColorToApply)
+	{
+		// (你之前的备用逻辑是完美的)
+		if (FLinearColor* DefaultColor = ColorMapping.Find(EColor::EC_None))
+		{ ColorToApply = DefaultColor; }
+		else
+		{
+			FLinearColor FallbackGray = FLinearColor(0.5f, 0.5f, 0.5f, 1.0f);
+			ColorToApply = &FallbackGray;
+		}
+	}
+
+	// 3. 应用到头发的 DMI
+	if (HairDMI)
+	{
+		HairDMI->SetVectorParameterValue(HairColorParameterName, *ColorToApply);
+	}
+	else { UE_LOG(LogTemp, Error, TEXT("HairDMI 为空!")); }
+
+	// 4. [!! 修复 !!] 应用到毛笔尖的 DMI
+	if (BrushTipDMI)
+	{
+		BrushTipDMI->SetVectorParameterValue(BrushTipColorParameterName, *ColorToApply);
+	}
+	else { UE_LOG(LogTemp, Error, TEXT("BrushTipDMI 为空!")); }
 }
