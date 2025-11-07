@@ -72,30 +72,26 @@ void UColorComponent::OnRep_CurrentColor()
 	}
 	MeshToControl->SetMaterial(0, MaterialToApply);
 	
-	// 2. 播放 VFX (使用 Niagara)
-	UNiagaraSystem* VFXToSpawn = nullptr; // [!! 修改 !!] 类型为 UNiagaraSystem
-	if (CurrentColor == EColor::EC_None)
+	if (PreviousColor != CurrentColor)
 	{
-		VFXToSpawn = DefaultPaintVFX; // [!! 修改 !!] 使用 Niagara 属性
-	}
-	else
-	{
-		// [!! 修改 !!] 从 TMap<EColor, UNiagaraSystem*> 中查找
-		if (TObjectPtr<UNiagaraSystem>* FoundVFX = ColorPaintVFX.Find(CurrentColor))
+		// 检查 DefaultPaintVFX 资产是否被指定
+		if (DefaultPaintVFX)
 		{
-			VFXToSpawn = *FoundVFX;
+			// Use SpawnSystemAttached to attach the VFX to the MeshComponent
+			UNiagaraFunctionLibrary::SpawnSystemAttached(
+				DefaultPaintVFX,                  // The Niagara System to spawn
+				MeshToControl,                    // The component to attach to (our mesh)
+				NAME_None,                        // Optional socket name
+				FVector(0.f),                     // Location offset (relative to attach point)
+				FRotator(0.f),                    // Rotation offset
+				EAttachLocation::SnapToTarget,    // Snap to the component
+				true                              // Auto-destroy when finished
+			);
 		}
-	}
-
-	if (VFXToSpawn)
-	{
-		// [!! 修改 !!] 使用 UNiagaraFunctionLibrary::SpawnSystemAtLocation 来播放
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			GetWorld(),
-			VFXToSpawn,
-			GetOwner()->GetActorLocation(),
-			GetOwner()->GetActorRotation()
-		);
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ColorComponent %s: 想要播放VFX，但 DefaultPaintVFX 未在蓝图中指定!"), *GetOwner()->GetName());
+		}
 	}
 
 	// 3. 调用蓝图事件 (用于物理效果)
