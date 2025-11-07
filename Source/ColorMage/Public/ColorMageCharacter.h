@@ -26,7 +26,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "UI")
 	EPawnControlType GetControlType() const { return ControlType; }
 	void RequestAcquireColor();
-	float DefaultGravityScale;
 protected:
 	// --- [!! GDD 修正：输入 !!] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
@@ -113,14 +112,10 @@ protected:
 	/** 材质中控制毛笔尖颜色的参数名称 (保持不变) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visuals|Color")
 	FName BrushTipColorParameterName = "BrushTipColor";
-
-	/** 汲取颜色的最大距离 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
-	float AcquireDistance = 15000.0f;
 private:
 	// --- [!! GDD 修正：已清理 !!] ---
 	TObjectPtr<USpringArmComponent> CameraSpringArm;
-	
+	float DefaultGravityScale;
 	FTimerHandle TimerHandle_DashFinished;
 	// [!! 已移除 !!] bIsManuallyAiming, bIsLerpingRotation, TargetRotation, TimerHandle_AutoAimReset
 	// [!! 已移除 !!] TargetArmLength, TargetSocketOffset
