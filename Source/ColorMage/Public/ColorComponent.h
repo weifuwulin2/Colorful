@@ -7,6 +7,7 @@
 #include "Components/ActorComponent.h"
 #include "ColorComponent.generated.h"
 
+class UNiagaraSystem;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnColorChanged, EColor, NewColor, EColor, OldColor);
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class COLORMAGE_API UColorComponent : public UActorComponent
@@ -53,12 +54,12 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Color Magic", meta=(DisplayName="On Color Effect Changed (Blueprint)"))
 	void K2_OnColorEffectChanged(EColor NewColor, EColor OldColor);
 
-	/** 存储VFX */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Effects")
-	TMap<EColor, TObjectPtr<UParticleSystem>> ColorPaintVFX;
+	TMap<EColor, TObjectPtr<UNiagaraSystem>> ColorPaintVFX;
 
+	/** 当被染成 EC_None (灰色) 时播放的 Niagara VFX */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Magic|Effects")
-	TObjectPtr<UParticleSystem> DefaultPaintVFX;
+	TObjectPtr<UNiagaraSystem> DefaultPaintVFX;
 
 private:
 	UPROPERTY()

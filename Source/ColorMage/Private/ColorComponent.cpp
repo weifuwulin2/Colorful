@@ -1,4 +1,6 @@
 #include "ColorComponent.h"
+
+#include "NiagaraFunctionLibrary.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "GameFramework/Actor.h"
@@ -70,22 +72,30 @@ void UColorComponent::OnRep_CurrentColor()
 	}
 	MeshToControl->SetMaterial(0, MaterialToApply);
 	
-	// 2. 播放 VFX
-	UParticleSystem* VFXToSpawn = nullptr;
+	// 2. 播放 VFX (使用 Niagara)
+	UNiagaraSystem* VFXToSpawn = nullptr; // [!! 修改 !!] 类型为 UNiagaraSystem
 	if (CurrentColor == EColor::EC_None)
 	{
-		VFXToSpawn = DefaultPaintVFX;
+		VFXToSpawn = DefaultPaintVFX; // [!! 修改 !!] 使用 Niagara 属性
 	}
 	else
 	{
-		if (TObjectPtr<UParticleSystem>* FoundVFX = ColorPaintVFX.Find(CurrentColor))
+		// [!! 修改 !!] 从 TMap<EColor, UNiagaraSystem*> 中查找
+		if (TObjectPtr<UNiagaraSystem>* FoundVFX = ColorPaintVFX.Find(CurrentColor))
 		{
 			VFXToSpawn = *FoundVFX;
 		}
 	}
+
 	if (VFXToSpawn)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), VFXToSpawn, GetOwner()->GetActorLocation(), GetOwner()->GetActorRotation());
+		// [!! 修改 !!] 使用 UNiagaraFunctionLibrary::SpawnSystemAtLocation 来播放
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(),
+			VFXToSpawn,
+			GetOwner()->GetActorLocation(),
+			GetOwner()->GetActorRotation()
+		);
 	}
 
 	// 3. 调用蓝图事件 (用于物理效果)

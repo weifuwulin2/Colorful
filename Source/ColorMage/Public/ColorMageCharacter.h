@@ -8,6 +8,7 @@
 #include "GameFramework/Character.h"
 #include "ColorMageCharacter.generated.h"
 
+class UNiagaraSystem;
 class USpringArmComponent;
 class AColorProjectile;
 
@@ -80,6 +81,9 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat")
 	float AcquireRotationDuration = 0.4f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Effects")
+	TObjectPtr<UNiagaraSystem> AcquireColorVFX;
 private:
 	// --- [!! GDD 修正：已清理 !!] ---
 	TObjectPtr<USpringArmComponent> CameraSpringArm;
