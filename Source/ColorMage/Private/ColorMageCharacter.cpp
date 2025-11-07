@@ -411,9 +411,11 @@ void AColorMageCharacter::RequestAcquireColor()
 	);
 }
 
+
+
 void AColorMageCharacter::AcquireColor_Internal()
 {
-	UE_LOG(LogTemp, Warning, TEXT("=== AcquireColor_Internal 开始执行 (MultiTrace) ==="));
+	UE_LOG(LogTemp, Warning, TEXT("=== AcquireColor_Internal 开始执行 (SingleTrace) ==="));
 
     APlayerController* PC = Cast<APlayerController>(GetController());
     if (!PC) 
@@ -429,87 +431,75 @@ void AColorMageCharacter::AcquireColor_Internal()
 
     // 2. 设置射线
     FVector TraceStart = CamLoc;
-    float AcquireDistance = 15500.0f;
+    // (AcquireDistance 现在从 .h 文件中获取)
     FVector TraceEnd = TraceStart + (CamRot.Vector() * AcquireDistance);
 
-    // 3. Multi Trace 检测 (你粘贴的代码)
-    TArray<FHitResult> HitResults;
+    // 3. [!! 已修改 !!] Single Trace 检测
+    FHitResult HitResult;
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(this);
     QueryParams.bTraceComplex = false;
     QueryParams.bReturnPhysicalMaterial = false;
 
-    bool bHit = GetWorld()->LineTraceMultiByChannel(
-       HitResults, TraceStart, TraceEnd,
-       ECollisionChannel::ECC_Visibility, QueryParams
+    bool bHit = GetWorld()->LineTraceSingleByChannel(
+       HitResult,
+       TraceStart,
+       TraceEnd,
+       ECollisionChannel::ECC_Visibility,
+       QueryParams
     );
+	
+	// (可选: 调试射线)
+    // DrawDebugLine(GetWorld(), TraceStart, bHit ? HitResult.Location : TraceEnd, bHit ? FColor::Green : FColor::Red, false, 2.0f);
 
-    UE_LOG(LogTemp, Warning, TEXT("Multi射线检测结果: %s, 命中数量: %d"), 
-          bHit ? TEXT("有命中") : TEXT("无命中"), HitResults.Num());
-
-    if (bHit && HitResults.Num() > 0)
+    if (bHit)
     {
-       // 4. 遍历所有命中结果，寻找 ColorSourceActor (你粘贴的代码)
-       AColorSourceActor* ClosestColorSource = nullptr;
-       float ClosestDistance = FLT_MAX;
-       for (const FHitResult& Hit : HitResults)
-       {
-          if (Hit.GetActor())
-          {
-             AColorSourceActor* ColorSource = Cast<AColorSourceActor>(Hit.GetActor());
-             if (ColorSource)
-             {
-                if (Hit.Distance < ClosestDistance)
-                {
-                   ClosestDistance = Hit.Distance;
-                   ClosestColorSource = ColorSource;
-                }
-             }
-          }
-       }
+		AActor* HitActor = HitResult.GetActor();
+		if (!HitActor) return; // 预防空指针
 
-       // 5. 处理最近的 ColorSource
-       if (ClosestColorSource)
-       {
-          UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
-          if (ColorManager)
-          {
-             UE_LOG(LogTemp, Warning, TEXT("处理最近的ColorSource: %s (距离: %f)"), 
-                   *ClosestColorSource->GetName(), ClosestDistance);
-             
-             // [!! 1. 成功提取，调用子系统 !!]
-             ColorManager->HandleAcquireColor(PC, ClosestColorSource);
+		UE_LOG(LogTemp, Log, TEXT("Single射线命中: %s"), *HitActor->GetName());
 
-             // --- [!! 2. 新增: 播放 VFX !!] ---
-             if (AcquireColorVFX)
-             {
-                // 在 *颜色源* 的位置播放特效
-                UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-                    GetWorld(),
-                    AcquireColorVFX,
-                    this->GetActorLocation(),
-                    this->GetActorRotation()
-                );
-             }
-             else
-             {
-                UE_LOG(LogTemp, Warning, TEXT("AcquireColor_Internal: 成功汲取，但 AcquireColorVFX 未在蓝图中指定!"));
-             }
-             // --- [!! 播放VFX结束 !!] ---
-          }
-          else
-          {
-             UE_LOG(LogTemp, Error, TEXT("ColorManagerSubsystem 为空！"));
-          }
-       }
-       else
-       {
-          UE_LOG(LogTemp, Log, TEXT("未找到任何 ColorSourceActor"));
-       }
+		// 4. 检查是否是 ColorSourceActor
+		AColorSourceActor* ColorSource = Cast<AColorSourceActor>(HitActor);
+		if (ColorSource)
+		{
+			// 5. 成功，处理 ColorSource
+			UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
+			if (ColorManager)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("处理 ColorSource: %s"), *ColorSource->GetName());
+				ColorManager->HandleAcquireColor(PC, ColorSource);
+
+				// 6. [!! 播放 VFX !!]
+				if (AcquireColorVFX)
+				{
+					// 在 *颜色源* 的位置播放特效
+					UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+						GetWorld(),
+						AcquireColorVFX,
+						ColorSource->GetActorLocation(),
+						ColorSource->GetActorRotation()
+					);
+				}
+				else
+				{
+					UE_LOG(LogTemp, Warning, TEXT("AcquireColor_Internal: 成功汲取，但 AcquireColorVFX 未在蓝图中指定!"));
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("ColorManagerSubsystem 为空！"));
+			}
+		}
+		else
+		{
+			// 击中了物体，但它不是 ColorSource (例如 云朵、墙壁、石头)
+			UE_LOG(LogTemp, Log, TEXT("击中的 %s 不是 ColorSourceActor。"), *HitActor->GetName());
+		}
     }
     else
     {
-       UE_LOG(LogTemp, Warning, TEXT("Multi射线未命中任何物体"));
+       UE_LOG(LogTemp, Warning, TEXT("Single射线未命中任何物体"));
     }
 }
 
