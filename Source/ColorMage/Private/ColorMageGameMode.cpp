@@ -5,6 +5,7 @@
 #include "ColorMageCharacter.h"         // 需要包含玩家角色
 #include "ColorMagePlayerState.h"
 #include "PossessablePawn.h"            // 需要包含可附身 Pawn
+#include "GameFramework/CharacterMovementComponent.h"
 
 AColorMageGameMode::AColorMageGameMode()
 {
@@ -43,71 +44,92 @@ void AColorMageGameMode::UpdateCheckpoint(const FTransform& NewCheckpointTransfo
 void AColorMageGameMode::RespawnPlayer(AController* PlayerController)
 {
 	if (!PlayerController)
-	{
-		UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: PlayerController 无效!"));
-		return;
-	}
+    {
+       UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: PlayerController 无效!"));
+       return;
+    }
 
-	UE_LOG(LogTemp, Warning, TEXT("GameMode: 正在为 %s 执行重生..."), *PlayerController->GetName());
+    UE_LOG(LogTemp, Warning, TEXT("GameMode: 正在为 %s 执行重生..."), *PlayerController->GetName());
 
-	// 尝试将 Controller 转换为我们的特定类型
-	AColorMageController* MageController = Cast<AColorMageController>(PlayerController);
-	if (!MageController)
-	{
-		UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 无法将 Controller 转换为 AColorMageController!"));
-		// 备用方案：尝试直接重启玩家？
-		// RestartPlayer(PlayerController);
-		return;
-	}
+    AColorMageController* MageController = Cast<AColorMageController>(PlayerController);
+    if (!MageController)
+    {
+       UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 无法将 Controller 转换为 AColorMageController!"));
+       return;
+    }
 
-	// --- [!! 处理附身状态 !!] ---
-	// 检查玩家当前是否附身在某个 Pawn 上 (而不是原始角色)
-	APawn* CurrentPawn = MageController->GetPawn();
-	AColorMageCharacter* OriginalCharacter = MageController->HiddenCharacter.Get(); // 获取隐藏的角色引用
+    // 获取玩家掉落时正在控制的 Pawn
+    APawn* FallingPawn = MageController->GetPawn();
+    // 获取存储在 Controller 中的“原始角色”（如果存在的话）
+    AColorMageCharacter* OriginalCharacter = MageController->HiddenCharacter.Get();
 
-	if (CurrentPawn && OriginalCharacter && CurrentPawn != OriginalCharacter)
-	{
-		UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 玩家当前附身在 %s。正在解除附身..."), *CurrentPawn->GetName());
-		// 如果玩家正附身在某个 Pawn (比如平台) 上，先解除附身
-		// 注意：我们直接调用 Possess，它会自动处理 UnPossess
-		MageController->Possess(OriginalCharacter); 
-		// Possess 会调用 OriginalCharacter->PossessedBy() 来取消隐藏
-		MageController->HiddenCharacter = nullptr; // 清除引用
-	}
-	else if (!CurrentPawn && OriginalCharacter)
-	{
-		// 如果由于某种原因控制器没有附身任何东西，但我们有隐藏角色，尝试附身
-		UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 控制器未附身，但有隐藏角色。正在尝试附身..."));
-		MageController->Possess(OriginalCharacter);
-		MageController->HiddenCharacter = nullptr;
-	}
-	else if (!OriginalCharacter)
-	{
-		// 如果连原始角色都没有了 (理论上不应该发生)，可能需要重新生成一个
-		UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 找不到原始角色引用! 可能需要重新生成角色。"));
-		// 这里可以调用 RestartPlayer(MageController); 来尝试重新生成默认 Pawn
-		RestartPlayer(MageController); // 尝试使用 GameMode 的标准重生逻辑
-		CurrentPawn = MageController->GetPawn(); // 获取新生成的 Pawn
-	}
-	
-	// 现在确保我们有一个有效的 Pawn 来传送
-	CurrentPawn = MageController->GetPawn(); // 再次获取 (可能是原始角色或新生成的)
-	if (CurrentPawn)
-	{
-		// [!! 传送 !!] 将玩家的 Pawn (现在应该是 ColorMageCharacter) 传送到最后检查点
-		CurrentPawn->TeleportTo(LastCheckpointTransform.GetLocation(), LastCheckpointTransform.GetRotation().Rotator(), false, true);
-		
-		// 可选：重置玩家状态 (比如颜色、生命值等)
-		AColorMagePlayerState* PlayerState = MageController->GetPlayerState<AColorMagePlayerState>();
-		if (PlayerState)
-		{
-			// PlayerState->Server_SetCurrentColor(EColor::EC_None); // 例如，重生后清除颜色
-		}
-		
-		UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 玩家已重生到 Checkpoint。"));
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 重生失败，最终未能获取有效的 Pawn!"));
-	}
+    AColorMageCharacter* CharacterToRespawn = nullptr; // 这是我们最终要传送的角色
+
+    // --- [!! 关键逻辑分支 !!] ---
+
+    // 情况 1: 玩家在附身时掉落
+    // (OriginalCharacter 有效，并且掉落的 Pawn 不是 OriginalCharacter)
+    if (OriginalCharacter && FallingPawn && FallingPawn != OriginalCharacter)
+    {
+        UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 玩家在附身 %s 时掉落。正在返回角色..."), *FallingPawn->GetName());
+        
+        // 我们要重生的是“原始角色”
+        CharacterToRespawn = OriginalCharacter;
+
+        // 强制控制器重新附身到原始角色
+        // Possess 会自动调用 UnPossess 来脱离 FallingPawn
+        MageController->Possess(CharacterToRespawn); 
+        MageController->HiddenCharacter = nullptr; // 清除引用
+
+        // (可选，但推荐) 销毁掉下去的那个 Pawn
+        FallingPawn->Destroy();
+    }
+    // 情况 2: 玩家角色自己掉落
+    // (OriginalCharacter 是空的，并且 FallingPawn 是我们的角色)
+    else if (!OriginalCharacter && Cast<AColorMageCharacter>(FallingPawn))
+    {
+        UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 玩家角色 %s 掉落。正在传送..."), *FallingPawn->GetName());
+        
+        // 我们要重生的就是这个掉下去的角色
+        CharacterToRespawn = Cast<AColorMageCharacter>(FallingPawn);
+    }
+    // 情况 3: 发生了意外情况
+    // (例如：OriginalCharacter 是空的，掉下去的也不是角色，或者一切都是空的)
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 状态未知! 尝试使用 RestartPlayer 重启..."));
+        // (你之前的逻辑)
+        RestartPlayer(MageController); 
+        CharacterToRespawn = Cast<AColorMageCharacter>(MageController->GetPawn()); // 获取新生成的角色
+    }
+    
+    // --- [!! 执行传送 !!] ---
+    if (CharacterToRespawn)
+    {
+       // [!! 传送 !!] 将角色传送到最后检查点
+       CharacterToRespawn->TeleportTo(LastCheckpointTransform.GetLocation(), LastCheckpointTransform.GetRotation().Rotator(), false, true);
+       
+       // [!! 关键 !!] 重置角色的移动状态
+       // (防止在空中冲刺时死亡，重生后继续以高速飞行)
+       UCharacterMovementComponent* MoveComp = CharacterToRespawn->GetCharacterMovement();
+       if (MoveComp)
+       {
+           MoveComp->StopMovementImmediately(); // 停止所有速度
+           MoveComp->SetMovementMode(MOVE_Walking); // 强制设为行走 (如果重生点在空中，它会自动变为 Falling)
+           MoveComp->GravityScale = CharacterToRespawn->DefaultGravityScale; // 恢复重力 (以防在 Dash 中死亡)
+       }
+
+       // (可选：重置颜色)
+       AColorMagePlayerState* PlayerState = MageController->GetPlayerState<AColorMagePlayerState>();
+       if (PlayerState)
+       {
+           // PlayerState->Server_SetCurrentColor(EColor::EC_None);
+       }
+       
+       UE_LOG(LogTemp, Log, TEXT("RespawnPlayer: 角色 %s 已重生到 Checkpoint。"), *CharacterToRespawn->GetName());
+    }
+    else
+    {
+       UE_LOG(LogTemp, Error, TEXT("RespawnPlayer: 重生失败，最终未能获取有效的 Pawn!"));
+    }
 }

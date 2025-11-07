@@ -26,6 +26,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "UI")
 	EPawnControlType GetControlType() const { return ControlType; }
 	void RequestAcquireColor();
+	float DefaultGravityScale;
 protected:
 	// --- [!! GDD 修正：输入 !!] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
@@ -115,7 +116,7 @@ protected:
 private:
 	// --- [!! GDD 修正：已清理 !!] ---
 	TObjectPtr<USpringArmComponent> CameraSpringArm;
-	float DefaultGravityScale;
+	
 	FTimerHandle TimerHandle_DashFinished;
 	// [!! 已移除 !!] bIsManuallyAiming, bIsLerpingRotation, TargetRotation, TimerHandle_AutoAimReset
 	// [!! 已移除 !!] TargetArmLength, TargetSocketOffset
