@@ -130,6 +130,8 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> HairDMI;
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> BrushTipDMI;
+
+	float AcquireDistance = 15500.f;
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

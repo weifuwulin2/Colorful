@@ -411,6 +411,8 @@ void AColorMageCharacter::RequestAcquireColor()
 	);
 }
 
+
+
 void AColorMageCharacter::AcquireColor_Internal()
 {
 	UE_LOG(LogTemp, Warning, TEXT("=== AcquireColor_Internal 开始执行 (MultiTrace) ==="));
@@ -422,95 +424,62 @@ void AColorMageCharacter::AcquireColor_Internal()
        return;
     }
 
-    // 1. 获取摄像机视角
-    FVector CamLoc; 
-    FRotator CamRot;
-    PC->GetPlayerViewPoint(CamLoc, CamRot);
+	// 1. 获取摄像机视角
+	FVector CamLoc; 
+	FRotator CamRot;
+	PC->GetPlayerViewPoint(CamLoc, CamRot);
 
-    // 2. 设置射线
-    FVector TraceStart = CamLoc;
-    float AcquireDistance = 15500.0f;
-    FVector TraceEnd = TraceStart + (CamRot.Vector() * AcquireDistance);
+	// 2. 设置射线
+	FVector TraceStart = CamLoc;
+	FVector TraceEnd = TraceStart + (CamRot.Vector() * AcquireDistance);
 
-    // 3. Multi Trace 检测 (你粘贴的代码)
-    TArray<FHitResult> HitResults;
-    FCollisionQueryParams QueryParams;
-    QueryParams.AddIgnoredActor(this);
-    QueryParams.bTraceComplex = false;
-    QueryParams.bReturnPhysicalMaterial = false;
+	// 3. Single Trace 检测
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+	QueryParams.bTraceComplex = false;
+	QueryParams.bReturnPhysicalMaterial = false;
 
-    bool bHit = GetWorld()->LineTraceMultiByChannel(
-       HitResults, TraceStart, TraceEnd,
-       ECollisionChannel::ECC_Visibility, QueryParams
-    );
+	bool bHit = GetWorld()->LineTraceSingleByChannel(
+	   HitResult, TraceStart, TraceEnd,
+	   ECollisionChannel::ECC_Visibility, QueryParams
+	);
+	
+	if (bHit)
+	{
+		AActor* HitActor = HitResult.GetActor();
+		if (!HitActor) return;
 
-    UE_LOG(LogTemp, Warning, TEXT("Multi射线检测结果: %s, 命中数量: %d"), 
-          bHit ? TEXT("有命中") : TEXT("无命中"), HitResults.Num());
+		// 4. 检查是否是 ColorSourceActor
+		AColorSourceActor* ColorSource = Cast<AColorSourceActor>(HitActor);
+		if (ColorSource)
+		{
+			// 5. 成功，处理 ColorSource
+			UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
+			if (ColorManager)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("处理 ColorSource: %s"), *ColorSource->GetName());
+				
+				// [!! 1. 成功提取 !!]
+				ColorManager->HandleAcquireColor(PC, ColorSource);
 
-    if (bHit && HitResults.Num() > 0)
-    {
-       // 4. 遍历所有命中结果，寻找 ColorSourceActor (你粘贴的代码)
-       AColorSourceActor* ClosestColorSource = nullptr;
-       float ClosestDistance = FLT_MAX;
-       for (const FHitResult& Hit : HitResults)
-       {
-          if (Hit.GetActor())
-          {
-             AColorSourceActor* ColorSource = Cast<AColorSourceActor>(Hit.GetActor());
-             if (ColorSource)
-             {
-                if (Hit.Distance < ClosestDistance)
-                {
-                   ClosestDistance = Hit.Distance;
-                   ClosestColorSource = ColorSource;
-                }
-             }
-          }
-       }
-
-       // 5. 处理最近的 ColorSource
-       if (ClosestColorSource)
-       {
-          UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
-          if (ColorManager)
-          {
-             UE_LOG(LogTemp, Warning, TEXT("处理最近的ColorSource: %s (距离: %f)"), 
-                   *ClosestColorSource->GetName(), ClosestDistance);
-             
-             // [!! 1. 成功提取，调用子系统 !!]
-             ColorManager->HandleAcquireColor(PC, ClosestColorSource);
-
-             // --- [!! 2. 新增: 播放 VFX !!] ---
-             if (AcquireColorVFX)
-             {
-                // 在 *颜色源* 的位置播放特效
-                UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-                    GetWorld(),
-                    AcquireColorVFX,
-                    this->GetActorLocation(),
-                    this->GetActorRotation()
-                );
-             }
-             else
-             {
-                UE_LOG(LogTemp, Warning, TEXT("AcquireColor_Internal: 成功汲取，但 AcquireColorVFX 未在蓝图中指定!"));
-             }
-             // --- [!! 播放VFX结束 !!] ---
-          }
-          else
-          {
-             UE_LOG(LogTemp, Error, TEXT("ColorManagerSubsystem 为空！"));
-          }
-       }
-       else
-       {
-          UE_LOG(LogTemp, Log, TEXT("未找到任何 ColorSourceActor"));
-       }
-    }
-    else
-    {
-       UE_LOG(LogTemp, Warning, TEXT("Multi射线未命中任何物体"));
-    }
+				// --- [!! 2. 播放 VFX !!] ---
+				if (AcquireColorVFX)
+				{
+					// 在 *颜色源* 的位置播放特效
+					UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+						GetWorld(),
+						AcquireColorVFX,
+						this->GetActorLocation(),
+						this->GetActorRotation()
+					);
+				}
+			}
+			else { /* Log Error */ }
+		}
+		else { /* Log (Hit wrong actor) */ }
+	}
+	else { /* Log (Trace missed) */ }
 }
 
 void AColorMageCharacter::SetAimRotation(bool bLockRotationToCamera)
