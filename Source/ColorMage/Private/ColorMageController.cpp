@@ -237,21 +237,40 @@ void AColorMageController::RequestRepossessOriginalCharacter()
 	if (HiddenCharacter.IsValid())
 	{
 		AColorMageCharacter* CharacterToRepossess = HiddenCharacter.Get();
-		APawn* CurrentPossessedPawn = GetPawn();
+		APawn* CurrentPossessedPawn = GetPawn(); 
 		FTransform ExitTransform = CharacterToRepossess->GetActorTransform(); 
+		
+		APossessablePawn* Possessable = nullptr; // [!!] 在外部声明
+
 		if (CurrentPossessedPawn)
 		{
-			APossessablePawn* Possessable = Cast<APossessablePawn>(CurrentPossessedPawn);
-			if (Possessable) { ExitTransform = Possessable->GetCharacterExitTransform(); }
-			else { ExitTransform = CurrentPossessedPawn->GetActorTransform(); ExitTransform.AddToTranslation(FVector(0,0,100)); }
+			Possessable = Cast<APossessablePawn>(CurrentPossessedPawn); // [!!] 赋值
+			if (Possessable) 
+			{ 
+				ExitTransform = Possessable->GetCharacterExitTransform(); 
+			}
+			else { /* ... (备用退出点) ... */ }
 		}
+		
+		// --- [!! 关键修复：VFX !!] ---
+		// 1. 在“当前Pawn” (平台/生物) 的位置播放解除附身特效
+		if (Possessable)
+		{
+			Possessable->PlayUnpossessEffect();
+		}
+		
+		// 2. 在“玩家” *即将出现* 的位置播放附身特效
+		// (我们先传送，再播放特效)
+		// --- [!! 修复结束 !!] ---
 		
 		Super::Possess(CharacterToRepossess);
 
+		// [!! 关键 !!] 先传送，再播放特效
 		CharacterToRepossess->TeleportTo(ExitTransform.GetLocation(), ExitTransform.GetRotation().Rotator(), false, true);
+		CharacterToRepossess->PlayPossessEffect(); // 在新位置播放
+
 		HiddenCharacter = nullptr;
 	}
-	else { /* ... (Log Warning) ... */ }
 }
 
 void AColorMageController::EnableInput(APlayerController* PlayerController)

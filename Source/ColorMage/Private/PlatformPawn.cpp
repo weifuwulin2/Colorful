@@ -4,6 +4,7 @@
 // 如果你想在 C++ 中直接创建它们的话
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
+#include "NiagaraFunctionLibrary.h"
 
 APlatformPawn::APlatformPawn()
 {
@@ -16,7 +17,7 @@ APlatformPawn::APlatformPawn()
 	// 或者，如果你确定所有平台都用水平移动：
 	// #include "HorizontalMovementComponent.h" // 需要包含头文件
 	// PlatformMovementComponent = CreateDefaultSubobject<UHorizontalMovementComponent>(TEXT("HorizontalMovement"));
-	ControlType = EPawnControlType::Platform;
+	
 }
 
 void APlatformPawn::BeginPlay()

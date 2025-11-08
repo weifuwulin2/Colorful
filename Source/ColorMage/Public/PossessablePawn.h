@@ -10,6 +10,7 @@
 #include "GameFramework/Pawn.h"
 #include "PossessablePawn.generated.h"
 
+class UNiagaraSystem;
 class UColorComponent; 
 UCLASS()
 class COLORMAGE_API APossessablePawn : public APawn, public IHighlightableInterface
@@ -24,6 +25,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "UI")
 	EPawnControlType GetControlType() const { return ControlType; }
 
+	UFUNCTION(BlueprintCallable, Category = "Effects")
+	virtual void PlayPossessEffect();
+
+	/** 在此 Pawn 的位置播放“解除附身”特效 */
+	UFUNCTION(BlueprintCallable, Category = "Effects")
+	virtual void PlayUnpossessEffect();
+	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
@@ -51,4 +59,11 @@ protected:
 
 	virtual void OnHighlight_Implementation() override;
 	virtual void OnUnhighlight_Implementation() override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects")
+	TObjectPtr<UNiagaraSystem> PossessVFX;
+
+	/** 当此 Pawn 被“解除附身”时播放的 Niagara 特效 (在蓝图中指定) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects")
+	TObjectPtr<UNiagaraSystem> UnpossessVFX;
 };

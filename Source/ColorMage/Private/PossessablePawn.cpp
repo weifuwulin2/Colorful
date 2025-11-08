@@ -6,6 +6,7 @@
 #include "ColorMageGameMode.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 
 APossessablePawn::APossessablePawn()
@@ -111,3 +112,37 @@ void APossessablePawn::OnUnhighlight_Implementation()
 	IHighlightableInterface::OnUnhighlight_Implementation();
 }
 
+// --- [!! 新增: VFX 函数实现 !!] ---
+void APossessablePawn::PlayPossessEffect()
+{
+	if (PossessVFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(),
+			PossessVFX,
+			GetActorLocation(), // 在 Pawn 自己的位置播放
+			GetActorRotation()
+		);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Pawn %s: PossessVFX 未指定!"), *GetName());
+	}
+}
+
+void APossessablePawn::PlayUnpossessEffect()
+{
+	if (UnpossessVFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(),
+			UnpossessVFX,
+			GetActorLocation(), // 在 Pawn 自己的位置播放
+			GetActorRotation()
+		);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Pawn %s: UnpossessVFX 未指定!"), *GetName());
+	}
+}

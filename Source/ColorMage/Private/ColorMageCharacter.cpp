@@ -411,7 +411,21 @@ void AColorMageCharacter::RequestAcquireColor()
 	);
 }
 
+void AColorMageCharacter::PlayUnpossessEffect()
+{
+	if (UnpossessVFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), UnpossessVFX, GetActorLocation(), GetActorRotation());
+	}
+}
 
+void AColorMageCharacter::PlayPossessEffect()
+{
+	if (PossessVFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), PossessVFX, GetActorLocation(), GetActorRotation());
+	}
+}
 
 void AColorMageCharacter::AcquireColor_Internal()
 {

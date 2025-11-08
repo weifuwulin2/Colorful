@@ -27,7 +27,24 @@ public:
 	EPawnControlType GetControlType() const { return ControlType; }
 	void RequestAcquireColor();
 	float DefaultGravityScale;
+
+	UFUNCTION(BlueprintCallable, Category = "Effects")
+	virtual void PlayUnpossessEffect();
+
+	/** 播放“附身” (返回身体) 的特效 */
+	UFUNCTION(BlueprintCallable, Category = "Effects")
+
+	virtual void PlayPossessEffect();
+	
 protected:
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects")
+	TObjectPtr<UNiagaraSystem> UnpossessVFX;
+
+	/** [!! 新增 !!] 当玩家“返回”此角色时播放的VFX */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects")
+	TObjectPtr<UNiagaraSystem> PossessVFX;
+	
 	// --- [!! GDD 修正：输入 !!] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> JumpAction;
@@ -42,7 +59,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	float DefaultCameraDist = 600.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
-	FVector DefaultCameraOffset = FVector(0.0f, 60.0f, 40.0f);
+	FVector DefaultCameraOffset = FVector(0.0f, 100.0f, 40.0f);
 	// [!! 已移除 !!] AimingCameraDist, AimingCameraOffset, ZoomInterpSpeed, HipFireRotationSpeed
 	// --- [!! GDD 修正结束 !!] ---
 

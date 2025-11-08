@@ -54,10 +54,19 @@ void UColorManagerSubsystem::AttemptPossession(APlayerController* Player, APosse
 	EColor PlayerColor = PlayerState->GetCurrentColor();
 	EColor TargetColor = TargetPawn->GetColor();
 
-	// GDD 规则：颜色必须完全一致
 	if (PlayerColor != EColor::EC_None && PlayerColor == TargetColor)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("ColorManager: 匹配成功，正在执行附身..."));
+
+		// --- [!! 关键修复：VFX !!] ---
+		// 1. 在“目标”位置播放附身特效
+		TargetPawn->PlayPossessEffect();
+		
+		// 2. 在“玩家”位置播放解除附身特效
+		CurrentCharacter->PlayUnpossessEffect();
+		// --- [!! 修复结束 !!] ---
+
+		// (隐藏角色、设置引用、Unpossess、Possess - 逻辑保持不变)
 		MageController->HiddenCharacter = CurrentCharacter;
 		CurrentCharacter->SetActorHiddenInGame(true);
 		CurrentCharacter->SetActorEnableCollision(false);

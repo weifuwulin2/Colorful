@@ -2,6 +2,7 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "ColorComponent.h"
+#include "CreatureCharacter.h"
 
 AColorProjectile::AColorProjectile()
 {
@@ -53,10 +54,25 @@ void AColorProjectile::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, 
     {
         return;
     }
-
+	// [!! 修改 !!] 特殊处理CreatureCharacter
+	if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(OtherActor))
+	{
+		// [!! 关键修改 !!] 使用投射物当前位置作为击中位置
+		FVector HitLocation = GetActorLocation();
+        
+		// 如果是从Sweep来的，使用SweepResult的位置更准确
+		if (bFromSweep && SweepResult.bBlockingHit)
+		{
+			HitLocation = SweepResult.Location;
+		}
+        
+		Creature->HitByColorProjectile(GetProjectileColor(), HitLocation);
+		Destroy();
+		return;
+	}
 	// 尝试获取目标的颜色组件
-    UColorComponent* TargetColorComp = OtherActor->FindComponentByClass<UColorComponent>();
-
+	UColorComponent* TargetColorComp = OtherActor->FindComponentByClass<UColorComponent>();
+	
     // 检查目标是否是“可上色的”(即，它有关心颜色的组件)
     if (TargetColorComp)
     {
