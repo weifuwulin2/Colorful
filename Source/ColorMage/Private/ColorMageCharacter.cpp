@@ -112,7 +112,7 @@ void AColorMageCharacter::BeginPlay()
 		UE_LOG(LogTemp, Error, TEXT("%s: 找不到 BrushMeshComponent!"), *GetName());
 	}
 
-	
+	CurrentHealth = MaxHealth;
 }
 
 // [!! 已移除 !!] Tick 函数已被移除
@@ -598,4 +598,54 @@ void AColorMageCharacter::OnPlayerColorChanged(EColor NewColor)
 		BrushTipDMI->SetVectorParameterValue(BrushTipColorParameterName, *ColorToApply);
 	}
 	else { UE_LOG(LogTemp, Error, TEXT("BrushTipDMI 为空!")); }
+}
+
+void AColorMageCharacter::TakeDamage(int32 DamageAmount)
+{
+	if (DamageAmount <= 0) return;
+    
+	CurrentHealth = FMath::Max(0, CurrentHealth - DamageAmount);
+    
+	UE_LOG(LogTemp, Warning, TEXT("玩家受到 %d 点伤害，当前血量：%d/%d"), DamageAmount, CurrentHealth, MaxHealth);
+    
+	// 广播血量变化
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+    
+	// 停止当前的回血计时器
+	GetWorld()->GetTimerManager().ClearTimer(HealthRegenTimerHandle);
+    
+	// 检查是否死亡
+	if (CurrentHealth <= 0)
+	{
+		UE_LOG(LogTemp, Error, TEXT("玩家死亡！"));
+		// 这里可以添加死亡处理逻辑
+		return;
+	}
+    
+	// 开始回血倒计时
+	StartHealthRegeneration();
+}
+void AColorMageCharacter::StartHealthRegeneration()
+{
+	if (CurrentHealth >= MaxHealth) return;
+    
+	GetWorld()->GetTimerManager().ClearTimer(HealthRegenTimerHandle);
+	GetWorld()->GetTimerManager().SetTimer(
+		HealthRegenTimerHandle,
+		this,
+		&AColorMageCharacter::RegenerateHealth,
+		HealthRegenDelay,
+		false
+	);
+}
+void AColorMageCharacter::RegenerateHealth()
+{
+	if (CurrentHealth >= MaxHealth) return;
+    
+	CurrentHealth = FMath::Min(MaxHealth, CurrentHealth + 1);
+    
+	UE_LOG(LogTemp, Log, TEXT("玩家回血：%d/%d"), CurrentHealth, MaxHealth);
+    
+	// 广播血量变化
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 }

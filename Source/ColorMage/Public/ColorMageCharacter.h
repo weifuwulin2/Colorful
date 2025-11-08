@@ -179,4 +179,40 @@ public:
     
 	UFUNCTION(BlueprintPure, Category = "Camera")
 	float GetCameraLagSpeed() const { return 3.0f; }
+
+public:
+	/** 血量系统 */
+	UFUNCTION(BlueprintCallable, Category = "Health")
+	void TakeDamage(int32 DamageAmount);
+    
+	UFUNCTION(BlueprintPure, Category = "Health")
+	int32 GetCurrentHealth() const { return CurrentHealth; }
+    
+	UFUNCTION(BlueprintPure, Category = "Health")
+	int32 GetMaxHealth() const { return MaxHealth; }
+    
+	/** 血量变化委托 */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHealthChanged, int32, CurrentHealth, int32, MaxHealth);
+	UPROPERTY(BlueprintAssignable, Category = "Health")
+	FOnHealthChanged OnHealthChanged;
+protected:
+	/** 血量设置 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+	int32 MaxHealth = 3;
+    
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Health")
+	int32 CurrentHealth = 3;
+    
+	/** 自动回血设置 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+	float HealthRegenDelay = 5.0f; // 5秒后开始回血
+    
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+	float HealthRegenRate = 1.0f; // 每秒回复多少血
+    
+	private:
+	FTimerHandle HealthRegenTimerHandle;
+    
+	void StartHealthRegeneration();
+	void RegenerateHealth();
 };

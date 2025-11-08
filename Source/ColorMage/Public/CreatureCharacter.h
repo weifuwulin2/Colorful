@@ -202,4 +202,5 @@ protected:
     float GetCameraHeight() const { return CameraHeight; }
     UFUNCTION(BlueprintPure, Category = "Camera")
     float GetCameraLagSpeed() const { return CameraLagSpeed; }
+    
 };
