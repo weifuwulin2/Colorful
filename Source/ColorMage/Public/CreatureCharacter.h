@@ -84,6 +84,7 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "Abilities") 
     void BP_OnJumpAbilityTriggered();
 
+    UFUNCTION(BlueprintPure)
     bool CanBePossessed() const {
         bool bResult = bCanBePossessed && (CurrentState == ECreatureState::Unified);
         UE_LOG(LogTemp, Warning, TEXT("Creature %s: CanBePossessed检查 - bCanBePossessed:%s, CurrentState:%d, 结果:%s"), 
