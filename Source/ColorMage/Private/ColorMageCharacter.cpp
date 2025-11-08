@@ -13,6 +13,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "NiagaraSystem.h"           
 #include "NiagaraFunctionLibrary.h"
+#include "Components/CapsuleComponent.h"
 
 AColorMageCharacter::AColorMageCharacter()
 {
@@ -68,7 +69,20 @@ void AColorMageCharacter::BeginPlay()
 		}
 	}
 	else { /* Log Error */ }
-
+	UE_LOG(LogTemp, Error, TEXT("=== CreatureCharacter碰撞调试: %s ==="), *GetName());
+    
+	if (USkeletalMeshComponent* SkeletalMeshComponent = GetMesh())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Mesh碰撞启用: %s"), SkeletalMeshComponent->GetCollisionEnabled() != ECollisionEnabled::NoCollision ? TEXT("是") : TEXT("否"));
+		UE_LOG(LogTemp, Error, TEXT("Mesh碰撞配置: %s"), *SkeletalMeshComponent->GetCollisionProfileName().ToString());
+		UE_LOG(LogTemp, Error, TEXT("Mesh可见性碰撞: %s"), SkeletalMeshComponent->GetCollisionResponseToChannel(ECC_Visibility) == ECR_Block ? TEXT("阻挡") : TEXT("不阻挡"));
+	}
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		UE_LOG(LogTemp, Error, TEXT("胶囊碰撞启用: %s"), Capsule->GetCollisionEnabled() != ECollisionEnabled::NoCollision ? TEXT("是") : TEXT("否"));
+		UE_LOG(LogTemp, Error, TEXT("胶囊碰撞配置: %s"), *Capsule->GetCollisionProfileName().ToString());
+		UE_LOG(LogTemp, Error, TEXT("胶囊可见性碰撞: %s"), Capsule->GetCollisionResponseToChannel(ECC_Visibility) == ECR_Block ? TEXT("阻挡") : TEXT("不阻挡"));
+	}
 	// 2. [!! 修复 !!] 为毛笔网格体创建 DMI
 	if (BrushMeshComponent)
 	{
@@ -97,6 +111,8 @@ void AColorMageCharacter::BeginPlay()
 	{
 		UE_LOG(LogTemp, Error, TEXT("%s: 找不到 BrushMeshComponent!"), *GetName());
 	}
+
+	
 }
 
 // [!! 已移除 !!] Tick 函数已被移除

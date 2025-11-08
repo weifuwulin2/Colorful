@@ -107,67 +107,85 @@ int32 ACreatureCharacter::GetBodyPartIndexFromHitLocation(FVector HitLocation)
     }
     return ClosestPartIndex;
 }
+
+FLinearColor ACreatureCharacter::GetLinearColorFromEnum(EColor InColor) const
+{
+	// 在颜色映射表中查找
+	for (const FColorMapping& Mapping : ColorMappings)
+	{
+		if (Mapping.ColorEnum == InColor)
+		{
+			return Mapping.LinearColor;
+		}
+	}
+    
+	// 如果没找到，返回灰色
+	UE_LOG(LogTemp, Warning, TEXT("找不到颜色 %d 的映射，使用灰色"), (int32)InColor);
+	return FLinearColor::Gray;
+}
+
 void ACreatureCharacter::UpdatePartColor(int32 PartIndex, EColor NewColor)
 {
-    if (PartIndex < 0 || PartIndex >= BodyParts.Num()) return;
-    FSimpleBodyPart& Part = BodyParts[PartIndex];
-    Part.CurrentColor = NewColor;
-    // 更新材质颜色
-    int32 MatIndex = Part.MaterialIndex;
-    if (MatIndex >= 0 && MatIndex < DynamicMaterials.Num() && DynamicMaterials[MatIndex])
-    {
-        FLinearColor NewLinearColor;
-        switch (NewColor)
-        {
-            case EColor::EC_Red:    NewLinearColor = FLinearColor::Red; break;
-            case EColor::EC_Green:  NewLinearColor = FLinearColor::Green; break;
-            case EColor::EC_Blue:   NewLinearColor = FLinearColor::Blue; break;
-            case EColor::EC_Yellow: NewLinearColor = FLinearColor::Yellow; break;
-            case EColor::EC_White:  NewLinearColor = FLinearColor::White; break;
-            case EColor::EC_Black:  NewLinearColor = FLinearColor::Black; break;
-            default:                NewLinearColor = FLinearColor::Gray; break;
-        }
+	if (PartIndex < 0 || PartIndex >= BodyParts.Num()) return;
+    
+	FSimpleBodyPart& Part = BodyParts[PartIndex];
+	Part.CurrentColor = NewColor;
+    
+	// 更新材质颜色
+	int32 MatIndex = Part.MaterialIndex;
+	if (MatIndex >= 0 && MatIndex < DynamicMaterials.Num() && DynamicMaterials[MatIndex])
+	{
+		// [!! 使用编辑器配置的颜色映射 !!]
+		FLinearColor NewLinearColor = GetLinearColorFromEnum(NewColor);
         
-        DynamicMaterials[MatIndex]->SetVectorParameterValue(TEXT("BaseColor"), NewLinearColor);
+		DynamicMaterials[MatIndex]->SetVectorParameterValue("BaseColor", NewLinearColor);
         
-        UE_LOG(LogTemp, Warning, TEXT("部位 %s 染色为 %d"), *Part.PartName, (int32)NewColor);
-    }
-    CheckColorUnity();
+		UE_LOG(LogTemp, Warning, TEXT("部位 %s 染色为 %d (线性颜色: %s)"), 
+			*Part.PartName, (int32)NewColor, *NewLinearColor.ToString());
+	}
+    
+	CheckColorUnity();
 }
 void ACreatureCharacter::CheckColorUnity()
 {
-    if (BodyParts.Num() == 0) return;
-    EColor FirstColor = BodyParts[0].CurrentColor;
-    if (FirstColor == EColor::EC_None) 
-    {
-        SetColor(EColor::EC_None);
-        CurrentState = ECreatureState::Hostile;
-        OnRep_CreatureState();
-        return;
-    }
-    // 检查是否所有部位颜色相同
-    bool bUnified = true;
-    for (const FSimpleBodyPart& Part : BodyParts)
-    {
-        if (Part.CurrentColor != FirstColor)
-        {
-            bUnified = false;
-            break;
-        }
-    }
-    if (bUnified)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Creature %s: 颜色统一为 %d！可以附身！"), *GetName(), (int32)FirstColor);
-        SetColor(FirstColor);
-        CurrentState = ECreatureState::Unified;
-    }
-    else
-    {
-        UE_LOG(LogTemp, Log, TEXT("Creature %s: 颜色未统一"), *GetName());
-        SetColor(EColor::EC_None);
-        CurrentState = ECreatureState::Hostile;
-    }
-    OnRep_CreatureState();
+	if (BodyParts.Num() == 0) return;
+	EColor FirstColor = BodyParts[0].CurrentColor;
+	if (FirstColor == EColor::EC_None) 
+	{
+		SetColor(EColor::EC_None);
+		CurrentState = ECreatureState::Hostile;
+		OnRep_CreatureState();
+		return;
+	}
+	// 检查是否所有部位颜色相同
+	bool bUnified = true;
+	for (const FSimpleBodyPart& Part : BodyParts)
+	{
+		if (Part.CurrentColor != FirstColor)
+		{
+			bUnified = false;
+			break;
+		}
+	}
+	if (bUnified)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Creature %s: 颜色统一为 %d！现在可以被附身！"), *GetName(), (int32)FirstColor);
+		SetColor(FirstColor);
+		CurrentState = ECreatureState::Unified;
+        
+		// [!! 新增：设置为可附身状态 !!]
+		bCanBePossessed = true;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Creature %s: 颜色未统一，保持敌对状态"), *GetName());
+		SetColor(EColor::EC_None);
+		CurrentState = ECreatureState::Hostile;
+        
+		// [!! 新增：设置为不可附身状态 !!]
+		bCanBePossessed = false;
+	}
+	OnRep_CreatureState();
 }
 /** 怪物 AI Tick */
 void ACreatureCharacter::Tick(float DeltaTime)

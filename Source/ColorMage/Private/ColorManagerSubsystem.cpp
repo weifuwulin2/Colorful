@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "ColorMageCharacter.h"
 #include "ColorMageController.h"
+#include "CreatureCharacter.h"
 
 /** (RMB) 处理汲取和混合逻辑 */
 void UColorManagerSubsystem::HandleAcquireColor(APlayerController* Player, AColorSourceActor* ColorSource)
@@ -44,40 +45,88 @@ void UColorManagerSubsystem::HandleAcquireColor(APlayerController* Player, AColo
 }
 
 /** (F) 尝试附身 (保持不变) */
-void UColorManagerSubsystem::AttemptPossession(APlayerController* Player, APossessablePawn* TargetPawn)
+void UColorManagerSubsystem::AttemptPossession(APlayerController* Player,  APawn* TargetPawn)
 {
-	AColorMagePlayerState* PlayerState = Player->GetPlayerState<AColorMagePlayerState>();
-	AColorMageController* MageController = Cast<AColorMageController>(Player);
-	AColorMageCharacter* CurrentCharacter = Cast<AColorMageCharacter>(Player->GetPawn()); 
-	if (!PlayerState || !TargetPawn || !MageController || !CurrentCharacter) { return; }
-
-	EColor PlayerColor = PlayerState->GetCurrentColor();
-	EColor TargetColor = TargetPawn->GetColor();
-
-	if (PlayerColor != EColor::EC_None && PlayerColor == TargetColor)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("ColorManager: 匹配成功，正在执行附身..."));
-
-		// --- [!! 关键修复：VFX !!] ---
-		// 1. 在“目标”位置播放附身特效
-		TargetPawn->PlayPossessEffect();
-		
-		// 2. 在“玩家”位置播放解除附身特效
-		CurrentCharacter->PlayUnpossessEffect();
-		// --- [!! 修复结束 !!] ---
-
-		// (隐藏角色、设置引用、Unpossess、Possess - 逻辑保持不变)
-		MageController->HiddenCharacter = CurrentCharacter;
-		CurrentCharacter->SetActorHiddenInGame(true);
-		CurrentCharacter->SetActorEnableCollision(false);
-		CurrentCharacter->SetActorTickEnabled(false);
-		Player->UnPossess();
-		Player->Possess(TargetPawn);
-	}
-	else 
-	{ 
-		UE_LOG(LogTemp, Warning, TEXT("ColorManager: 附身失败，颜色不匹配。"));
-	}
+	if (!Player || !TargetPawn)
+    {
+        UE_LOG(LogTemp, Error, TEXT("AttemptPossession: Player 或 TargetPawn 为空"));
+        return;
+    }
+    AColorMagePlayerState* PS = Player->GetPlayerState<AColorMagePlayerState>();
+    if (!PS)
+    {
+        UE_LOG(LogTemp, Error, TEXT("AttemptPossession: 找不到 ColorMagePlayerState"));
+        return;
+    }
+    EColor PlayerColor = PS->GetCurrentColor();
+    if (PlayerColor == EColor::EC_None)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AttemptPossession: 玩家当前没有颜色，无法附身"));
+        return;
+    }
+    // [!! 修改：支持两种类型的Pawn !!]
+    EColor TargetColor = EColor::EC_None;
+    bool bCanBePossessed = false;
+    // 检查是否为APossessablePawn
+    if (APossessablePawn* PossessablePawn = Cast<APossessablePawn>(TargetPawn))
+    {
+        TargetColor = PossessablePawn->GetColor();
+        bCanBePossessed = PossessablePawn->bCanBePossessed;
+        UE_LOG(LogTemp, Log, TEXT("检测到APossessablePawn: %s"), *PossessablePawn->GetName());
+    }
+    // 检查是否为ACreatureCharacter
+    else if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(TargetPawn))
+    {
+        TargetColor = Creature->GetColor();
+        bCanBePossessed = Creature->CanBePossessed();
+        UE_LOG(LogTemp, Log, TEXT("检测到ACreatureCharacter: %s"), *Creature->GetName());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("AttemptPossession: 目标不是可附身的类型"));
+        return;
+    }
+    // 检查颜色匹配
+    if (PlayerColor != TargetColor)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AttemptPossession: 颜色不匹配。玩家: %d, 目标: %d"), 
+            (int32)PlayerColor, (int32)TargetColor);
+        return;
+    }
+    // 检查是否可以被附身
+    if (!bCanBePossessed)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AttemptPossession: 目标当前不能被附身"));
+        return;
+    }
+    // 执行附身
+    UE_LOG(LogTemp, Warning, TEXT("AttemptPossession: 开始附身 %s"), *TargetPawn->GetName());
+    AColorMageController* ColorMageController = Cast<AColorMageController>(Player);
+    if (!ColorMageController)
+    {
+        UE_LOG(LogTemp, Error, TEXT("AttemptPossession: Player 不是 ColorMageController"));
+        return;
+    }
+    // 保存当前角色
+    APawn* CurrentPawn = Player->GetPawn();
+    if (AColorMageCharacter* ColorMageChar = Cast<AColorMageCharacter>(CurrentPawn))
+    {
+        ColorMageController->HiddenCharacter = ColorMageChar;
+        ColorMageChar->SetActorHiddenInGame(true);
+        ColorMageChar->SetActorEnableCollision(false);
+    }
+    // 播放特效
+    if (APossessablePawn* PossessablePawn = Cast<APossessablePawn>(TargetPawn))
+    {
+        PossessablePawn->PlayPossessEffect();
+    }
+    else if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(TargetPawn))
+    {
+        Creature->PlayPossessEffect();
+    }
+    // 执行附身
+    Player->Possess(TargetPawn);
+    UE_LOG(LogTemp, Warning, TEXT("AttemptPossession: 附身成功！"));
 }
 
 

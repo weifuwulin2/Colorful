@@ -25,7 +25,7 @@ public:
 
 	/** (F) 尝试附身到"可附身物体" */
 	UFUNCTION(BlueprintCallable, Category = "Color Magic")
-	void AttemptPossession(APlayerController* Player, APossessablePawn* TargetPawn);
+	void AttemptPossession(APlayerController* Player,  APawn* TargetPawn);
 
 protected:
 	// --- [!! 混合逻辑辅助函数 (已重构) !!] ---

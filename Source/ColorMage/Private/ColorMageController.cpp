@@ -10,6 +10,7 @@
 #include "ColorMagePlayerState.h"
 #include "PossessablePawn.h"
 #include "ColorSourceActor.h" 
+#include "CreatureCharacter.h"
 
 AColorMageController::AColorMageController()
 {
@@ -18,124 +19,158 @@ AColorMageController::AColorMageController()
 }
 void AColorMageController::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+    Super::Tick(DeltaTime);
 
-	// 1. 检查是否在控制角色
-	AColorMageCharacter* MyCharacter = Cast<AColorMageCharacter>(GetPawn());
-	if (!MyCharacter)
-	{
-		// [!! 清理状态 !!] 如果不在控制角色 (比如在附身平台)
-		
-		// 1a. 清除高亮
-		if (CurrentHighlightedActor.IsValid() && CurrentHighlightedActor->Implements<UHighlightableInterface>())
-		{
-			IHighlightableInterface::Execute_OnUnhighlight(CurrentHighlightedActor.Get());
-		}
-		CurrentHighlightedActor = nullptr;
+    // 1. 检查是否在控制角色
+    AColorMageCharacter* MyCharacter = Cast<AColorMageCharacter>(GetPawn());
+    if (!MyCharacter)
+    {
+        // 清理状态
+        if (CurrentHighlightedActor.IsValid() && CurrentHighlightedActor->Implements<UHighlightableInterface>())
+        {
+            IHighlightableInterface::Execute_OnUnhighlight(CurrentHighlightedActor.Get());
+        }
+        CurrentHighlightedActor = nullptr;
+        
+        if (CurrentTargetType != EReticleTargetType::None)
+        {
+            CurrentTargetType = EReticleTargetType::None;
+            OnReticleTargetChanged.Broadcast(CurrentTargetType);
+        }
+        return;
+    }
 
-		// 1b. 清除准星
-		if (CurrentTargetType != EReticleTargetType::None)
-		{
-			CurrentTargetType = EReticleTargetType::None;
-			OnReticleTargetChanged.Broadcast(CurrentTargetType);
-		}
-		return;
-	}
+    // 2. 设置射线
+    FVector CameraLocation; FRotator CameraRotation;
+    GetPlayerViewPoint(CameraLocation, CameraRotation);
+    FVector TraceStart = CameraLocation;
+    FVector TraceEnd = TraceStart + (CameraRotation.Vector() * ReticleTraceDistance);
+    
+    EReticleTargetType NewTargetType = EReticleTargetType::None;
+    AActor* NewHitActor = nullptr;
 
-	// 2. 设置射线
-	FVector CameraLocation; FRotator CameraRotation;
-	GetPlayerViewPoint(CameraLocation, CameraRotation);
-	FVector TraceStart = CameraLocation;
-	FVector TraceEnd = TraceStart + (CameraRotation.Vector() * ReticleTraceDistance);
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(GetPawn()); 
+    // 3. 执行射线检测 - 恢复原始的单次检测
+    FHitResult HitResult;
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(GetPawn());
 
-	EReticleTargetType NewTargetType = EReticleTargetType::None; // 默认为 "无"
-	AActor* NewHitActor = nullptr; // 存储当前帧命中的 Actor
+    if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Pawn, QueryParams))
+    {
+        AActor* HitActor = HitResult.GetActor();
+        if (HitActor)
+        {
+            // [!! 按优先级检查各种类型 !!]
+            
+            // 优先级1: AColorSourceActor (用于提取颜色)
+            if (HitActor->IsA<AColorSourceActor>())
+            {
+                NewTargetType = EReticleTargetType::Extractable;
+                if (HitActor->Implements<UHighlightableInterface>())
+                {
+                    NewHitActor = HitActor;
+                }
+            }
+            // 优先级2: APossessablePawn (可附身平台)
+            else if (APossessablePawn* PossPawn = Cast<APossessablePawn>(HitActor))
+            {
+                AColorMagePlayerState* PS = GetPlayerState<AColorMagePlayerState>();
+                if (PS && PS->GetCurrentColor() != EColor::EC_None && PS->GetCurrentColor() == PossPawn->GetColor())
+                {
+                    NewTargetType = EReticleTargetType::Possessable;
+                }
+                if (PossPawn->Implements<UHighlightableInterface>())
+                {
+                    NewHitActor = PossPawn;
+                }
+            }
+            else if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(HitActor))
+            {
+            	AColorMagePlayerState* PS = GetPlayerState<AColorMagePlayerState>();
+            	if (PS && PS->GetCurrentColor() != EColor::EC_None && 
+					PS->GetCurrentColor() == Creature->GetColor() && 
+					Creature->CanBePossessed())
+            	{
+            		NewTargetType = EReticleTargetType::Possessable;
+            	}
+            	if (Creature->Implements<UHighlightableInterface>())
+            	{
+            		NewHitActor = Creature;
+            	}
+            }
+            // 优先级3: AColorableActor (可染色物体)
+            else if (AColorableActor* ColorActor = Cast<AColorableActor>(HitActor))
+            {
+                NewTargetType = EReticleTargetType::Paintable;
+                if (ColorActor->Implements<UHighlightableInterface>())
+                {
+                    NewHitActor = ColorActor;
+                }
+            }
+            // 其他可高亮的物体
+            else if (HitActor->Implements<UHighlightableInterface>())
+            {
+                NewHitActor = HitActor;
+            }
+        }
+    }
 
-	// 3. 执行射线检测
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
-	{
-		AActor* HitActor = HitResult.GetActor();
-		if (HitActor)
-		{
-			// --- [!! 逻辑 A: 更新准星 UI (EReticleTargetType) !!] ---
-			// (这是你粘贴的逻辑，但基于 No. 40 修复了)
-			if (HitActor->IsA<AColorSourceActor>())
-			{
-				NewTargetType = EReticleTargetType::Extractable;
-			}
-			else if (APossessablePawn* PossPawn = Cast<APossessablePawn>(HitActor))
-			{
-				AColorMagePlayerState* PS = GetPlayerState<AColorMagePlayerState>();
-				if (PS && PS->GetCurrentColor() != EColor::EC_None && PS->GetCurrentColor() == PossPawn->GetColor())
-				{
-					NewTargetType = EReticleTargetType::Possessable;
-				}
-			}
-			else if (AColorableActor* ColorActor = Cast<AColorableActor>(HitActor))
-			{
-				NewTargetType = EReticleTargetType::Paintable;
-			}
-			// (如果击中了其他东西，保持 NewTargetType = EReticleTargetType::None)
+   
+    // 5. 更新准星UI
+    if (NewTargetType != CurrentTargetType)
+    {
+        CurrentTargetType = NewTargetType;
+        OnReticleTargetChanged.Broadcast(CurrentTargetType);
+    }
 
-			// --- [!! 逻辑 B: 更新轮廓高亮 (IHighlightableInterface) !!] ---
-			if (HitActor->Implements<UHighlightableInterface>())
-			{
-				// 这个 Actor 可以被高亮
-				NewHitActor = HitActor;
-			}
-		}
-	}
-	// (如果射线什么也没打中, NewTargetType = None, NewHitActor = nullptr)
+    // 6. 更新高亮
+    if (NewHitActor != CurrentHighlightedActor.Get())
+    {
+        if (CurrentHighlightedActor.IsValid() && CurrentHighlightedActor->Implements<UHighlightableInterface>())
+        {
+            IHighlightableInterface::Execute_OnUnhighlight(CurrentHighlightedActor.Get());
+        }
 
-	// 4. 广播准星 UI 更新 (仅当状态改变时)
-	if (NewTargetType != CurrentTargetType)
-	{
-		CurrentTargetType = NewTargetType;
-		OnReticleTargetChanged.Broadcast(CurrentTargetType);
-	}
+        if (NewHitActor)
+        {
+            IHighlightableInterface::Execute_OnHighlight(NewHitActor);
+        }
 
-	// 5. 调用高亮回调 (仅当 Actor 改变时)
-	if (NewHitActor != CurrentHighlightedActor.Get())
-	{
-		// 取消高亮“旧”的 Actor
-		if (CurrentHighlightedActor.IsValid() && CurrentHighlightedActor->Implements<UHighlightableInterface>())
-		{
-			IHighlightableInterface::Execute_OnUnhighlight(CurrentHighlightedActor.Get());
-		}
-
-		// 高亮“新”的 Actor
-		if (NewHitActor) // (我们已经知道它实现了接口)
-		{
-			IHighlightableInterface::Execute_OnHighlight(NewHitActor);
-		}
-
-		// 更新“当前”高亮的 Actor
-		CurrentHighlightedActor = NewHitActor;
-	}
+        CurrentHighlightedActor = NewHitActor;
+    }
 }
+
+
 void AColorMageController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
-	
+    
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
 		Subsystem->ClearAllMappings();
 		if (DefaultInputMappingContext) { Subsystem->AddMappingContext(DefaultInputMappingContext, 0); }
 	}
-    if (PlayerCameraManager) { PlayerCameraManager->ViewPitchMin = -70.0f; PlayerCameraManager->ViewPitchMax = 80.0f; }
+	if (PlayerCameraManager) { PlayerCameraManager->ViewPitchMin = -70.0f; PlayerCameraManager->ViewPitchMax = 80.0f; }
 	bShowMouseCursor = false;
 	FInputModeGameOnly InputMode;
 	InputMode.SetConsumeCaptureMouseDown(true); 
 	SetInputMode(InputMode);
-	
+    
 	EPawnControlType PossessedType = EPawnControlType::Unknown;
 	if (InPawn)
 	{
-		if (AColorMageCharacter* ColorMageCharacter = Cast<AColorMageCharacter>(InPawn)) { PossessedType = ColorMageCharacter->GetControlType(); }
-		else if (APossessablePawn* PossPawn = Cast<APossessablePawn>(InPawn)) { PossessedType = PossPawn->GetControlType(); }
+		if (AColorMageCharacter* ColorMageCharacter = Cast<AColorMageCharacter>(InPawn)) 
+		{ 
+			PossessedType = ColorMageCharacter->GetControlType(); 
+		}
+		else if (APossessablePawn* PossPawn = Cast<APossessablePawn>(InPawn)) 
+		{ 
+			PossessedType = PossPawn->GetControlType(); 
+		}
+		// [!! 新增：支持CreatureCharacter !!]
+		else if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(InPawn))
+		{
+			PossessedType = Creature->GetControlType();
+		}
 	}
 	OnPawnControlChanged.Broadcast(PossessedType);
 	CurrentTargetType = EReticleTargetType::None;
@@ -216,16 +251,17 @@ void AColorMageController::OnPossessInteract()
 		this, TraceStart, TraceEnd, ETraceTypeQuery::TraceTypeQuery1,
 		false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true
 	);
-
 	if (bHit && HitResult.GetActor())
 	{
-		APossessablePawn* TargetPawn = Cast<APossessablePawn>(HitResult.GetActor());
-		if (TargetPawn)
+		// [!! 简化：统一处理两种类型 !!]
+		APawn* TargetPawn = Cast<APawn>(HitResult.GetActor());
+		if (TargetPawn && 
+			(TargetPawn->IsA<APossessablePawn>() || TargetPawn->IsA<ACreatureCharacter>()))
 		{
 			UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
 			if (ColorManager)
 			{
-				ColorManager->AttemptPossession(this, TargetPawn);
+				ColorManager->AttemptPossession(this, TargetPawn); // [!! 统一调用 !!]
 			}
 		}
 	}
@@ -239,36 +275,43 @@ void AColorMageController::RequestRepossessOriginalCharacter()
 		AColorMageCharacter* CharacterToRepossess = HiddenCharacter.Get();
 		APawn* CurrentPossessedPawn = GetPawn(); 
 		FTransform ExitTransform = CharacterToRepossess->GetActorTransform(); 
-		
-		APossessablePawn* Possessable = nullptr; // [!!] 在外部声明
-
+        
+		APossessablePawn* Possessable = nullptr;
+		ACreatureCharacter* Creature = nullptr; // [!! 新增 !!]
 		if (CurrentPossessedPawn)
 		{
-			Possessable = Cast<APossessablePawn>(CurrentPossessedPawn); // [!!] 赋值
+			Possessable = Cast<APossessablePawn>(CurrentPossessedPawn);
 			if (Possessable) 
 			{ 
 				ExitTransform = Possessable->GetCharacterExitTransform(); 
 			}
-			else { /* ... (备用退出点) ... */ }
+			// [!! 新增：处理CreatureCharacter !!]
+			else if (Creature == Cast<ACreatureCharacter>(CurrentPossessedPawn))
+			{
+				ExitTransform = Creature->GetCharacterExitTransform();
+			}
+			else 
+			{ 
+				/* ... (备用退出点) ... */ 
+			}
 		}
-		
+        
 		// --- [!! 关键修复：VFX !!] ---
-		// 1. 在“当前Pawn” (平台/生物) 的位置播放解除附身特效
+		// 1. 在"当前Pawn" (平台/生物) 的位置播放解除附身特效
 		if (Possessable)
 		{
 			Possessable->PlayUnpossessEffect();
 		}
-		
-		// 2. 在“玩家” *即将出现* 的位置播放附身特效
-		// (我们先传送，再播放特效)
-		// --- [!! 修复结束 !!] ---
-		
+		// [!! 新增：CreatureCharacter的特效 !!]
+		else if (Creature)
+		{
+			Creature->PlayUnpossessEffect();
+		}
+        
 		Super::Possess(CharacterToRepossess);
-
 		// [!! 关键 !!] 先传送，再播放特效
 		CharacterToRepossess->TeleportTo(ExitTransform.GetLocation(), ExitTransform.GetRotation().Rotator(), false, true);
 		CharacterToRepossess->PlayPossessEffect(); // 在新位置播放
-
 		HiddenCharacter = nullptr;
 	}
 }

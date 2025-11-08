@@ -31,7 +31,7 @@ public:
 	/** 在此 Pawn 的位置播放“解除附身”特效 */
 	UFUNCTION(BlueprintCallable, Category = "Effects")
 	virtual void PlayUnpossessEffect();
-	
+	bool bCanBePossessed = false;
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
@@ -55,7 +55,7 @@ protected:
 	/** 当 Actor 被认为掉出世界时由引擎调用 */
 	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
 
-	bool bCanBePossessed = false;
+	
 
 	virtual void OnHighlight_Implementation() override;
 	virtual void OnUnhighlight_Implementation() override;

@@ -13,6 +13,17 @@ class USceneComponent;
 class UNiagaraSystem;
 class UAnimMontage;
 
+
+USTRUCT(BlueprintType)
+struct FColorMapping
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    EColor ColorEnum = EColor::EC_Red;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FLinearColor LinearColor = FLinearColor::Red;
+};
+
 USTRUCT(BlueprintType)
 struct FSimpleBodyPart
 {
@@ -69,6 +80,16 @@ public:
     /** 子类重写这个函数来实现自己的Jump能力 */
     UFUNCTION(BlueprintImplementableEvent, Category = "Abilities") 
     void BP_OnJumpAbilityTriggered();
+
+    bool CanBePossessed() const {
+        bool bResult = bCanBePossessed && (CurrentState == ECreatureState::Unified);
+        UE_LOG(LogTemp, Warning, TEXT("Creature %s: CanBePossessed检查 - bCanBePossessed:%s, CurrentState:%d, 结果:%s"), 
+            *GetName(), 
+            bCanBePossessed ? TEXT("true") : TEXT("false"),
+            (int32)CurrentState,
+            bResult ? TEXT("true") : TEXT("false"));
+        return bResult;
+    }
 
 protected:
     virtual void BeginPlay() override;
@@ -137,6 +158,9 @@ protected:
     /** 身体部位列表 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Body Parts")
     TArray<FSimpleBodyPart> BodyParts;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Body Parts")
+    TArray<FColorMapping> ColorMappings;
     /** 动态材质数组 */
     UPROPERTY()
     TArray<TObjectPtr<UMaterialInstanceDynamic>> DynamicMaterials;
@@ -147,7 +171,8 @@ public:
 private:
     /** 根据击中位置确定是哪个身体部位 */
     int32 GetBodyPartIndexFromHitLocation(FVector HitLocation);
-    
+    FLinearColor GetLinearColorFromEnum(EColor InColor) const;
+
     /** 更新部位颜色 */
     void UpdatePartColor(int32 PartIndex, EColor NewColor);
     
