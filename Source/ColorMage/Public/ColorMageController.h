@@ -8,6 +8,8 @@
 #include "InputMappingContext.h"
 #include "ColorMageController.generated.h"
 
+class ACreatureCharacter;
+
 UENUM(BlueprintType)
 enum class EReticleTargetType : uint8
 {
@@ -63,6 +65,7 @@ protected:
 	TObjectPtr<UInputAction> AcquireAction; 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> PossessAction;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Color Magic")
 	float ReticleTraceDistance = 15500.0f;
 protected:
@@ -87,4 +90,15 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> CurrentHighlightedActor = nullptr;
+
+public:
+	// [!! 新增：摄像机设置函数 !!]
+	UFUNCTION(BlueprintCallable, Category = "Camera")
+	void SetCameraForCreature(ACreatureCharacter* Creature);
+	UFUNCTION(BlueprintCallable, Category = "Camera")
+	void SetCameraForCharacterType(AColorMageCharacter* ColorMageChar);
+	
+	// [!! 新增：获取当前F键功能的函数，供UI使用 !!]
+	UFUNCTION(BlueprintPure, Category = "UI")
+	FString GetInteractionPrompt() const;
 };

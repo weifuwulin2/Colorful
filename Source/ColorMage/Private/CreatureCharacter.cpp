@@ -415,3 +415,14 @@ void ACreatureCharacter::PlayUnpossessEffect()
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), UnpossessVFX, GetActorLocation(), GetActorRotation());
 	}
 }
+
+void ACreatureCharacter::OnHighlight_Implementation()
+{
+	UE_LOG(LogTemp, Warning, TEXT("CreatureCharacter高亮: %s"), *GetName());
+	// 添加高亮效果
+}
+void ACreatureCharacter::OnUnhighlight_Implementation()
+{
+	UE_LOG(LogTemp, Warning, TEXT("CreatureCharacter取消高亮: %s"), *GetName());
+	// 移除高亮效果
+}

@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "ColorTypes.h"
+#include "HighlightableInterface.h"
 #include "PawnControlType.h"
 #include "GameFramework/Character.h"
 #include "CreatureCharacter.generated.h"
@@ -44,7 +45,7 @@ struct FSimpleBodyPart
 
 
 UCLASS(Abstract) // [!! 新增 !!] 标记为抽象基类
-class COLORMAGE_API ACreatureCharacter : public ACharacter
+class COLORMAGE_API ACreatureCharacter : public ACharacter, public IHighlightableInterface
 {
     GENERATED_BODY()
 
@@ -71,6 +72,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Effects")
     virtual void PlayUnpossessEffect();
+    void OnHighlight_Implementation();
+    void OnUnhighlight_Implementation();
 
     // [!! 新增 !!] 虚函数供子类重写
     /** 子类重写这个函数来实现自己的LMB能力 */
@@ -181,4 +184,21 @@ private:
     
     /** 初始化材质 */
     void InitMaterials();
+
+protected:
+    // [!! 新增：摄像机距离设置 !!]
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (AllowPrivateAccess = "true"))
+    float CameraDistance = 400.0f;  // 默认距离
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (AllowPrivateAccess = "true"))
+    float CameraHeight = 100.0f;    // 摄像机高度偏移
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (AllowPrivateAccess = "true"))
+    float CameraLagSpeed = 3.0f;    // 摄像机跟随速度
+    public:
+    // [!! 新增：获取摄像机设置的函数 !!]
+    UFUNCTION(BlueprintPure, Category = "Camera")
+    float GetCameraDistance() const { return CameraDistance; }
+    UFUNCTION(BlueprintPure, Category = "Camera")
+    float GetCameraHeight() const { return CameraHeight; }
+    UFUNCTION(BlueprintPure, Category = "Camera")
+    float GetCameraLagSpeed() const { return CameraLagSpeed; }
 };

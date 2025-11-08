@@ -168,4 +168,15 @@ protected:
 	
 	UFUNCTION()
 	void OnPlayerColorChanged(EColor NewColor);
+
+public:
+	// [!! 新增：摄像机设置获取函数 !!]
+	UFUNCTION(BlueprintPure, Category = "Camera")
+	float GetCameraDistance() const { return DefaultCameraDist; }
+    
+	UFUNCTION(BlueprintPure, Category = "Camera") 
+	FVector GetCameraOffset() const { return DefaultCameraOffset; }
+    
+	UFUNCTION(BlueprintPure, Category = "Camera")
+	float GetCameraLagSpeed() const { return 3.0f; }
 };

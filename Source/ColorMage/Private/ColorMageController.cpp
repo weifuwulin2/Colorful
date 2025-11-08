@@ -11,6 +11,8 @@
 #include "PossessablePawn.h"
 #include "ColorSourceActor.h" 
 #include "CreatureCharacter.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 
 AColorMageController::AColorMageController()
 {
@@ -142,6 +144,7 @@ void AColorMageController::Tick(float DeltaTime)
 
 void AColorMageController::OnPossess(APawn* InPawn)
 {
+	
 	Super::OnPossess(InPawn);
     
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -161,15 +164,20 @@ void AColorMageController::OnPossess(APawn* InPawn)
 		if (AColorMageCharacter* ColorMageCharacter = Cast<AColorMageCharacter>(InPawn)) 
 		{ 
 			PossessedType = ColorMageCharacter->GetControlType(); 
+			// [!! 重置为法师角色的默认摄像机设置 !!]
+			SetCameraForCharacterType(ColorMageCharacter);
 		}
 		else if (APossessablePawn* PossPawn = Cast<APossessablePawn>(InPawn)) 
 		{ 
 			PossessedType = PossPawn->GetControlType(); 
+			// 平台使用默认设置
 		}
-		// [!! 新增：支持CreatureCharacter !!]
+		// [!! 新增：支持CreatureCharacter并设置摄像机 !!]
 		else if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(InPawn))
 		{
 			PossessedType = Creature->GetControlType();
+			// [!! 为大型生物设置摄像机 !!]
+			SetCameraForCreature(Creature);
 		}
 	}
 	OnPawnControlChanged.Broadcast(PossessedType);
@@ -238,34 +246,69 @@ void AColorMageController::OnAcquire()
 
 // --- [!! GDD 修正：新函数 !!] ---
 /** (F) 处理附身请求 */
+/** (F) 处理附身请求 */
+/** (F) 处理附身/取消附身请求 */
 void AColorMageController::OnPossessInteract()
 {
-	FVector CamLoc; FRotator CamRot;
-	GetPlayerViewPoint(CamLoc, CamRot);
-	FVector TraceStart = CamLoc;
-	FVector TraceEnd = TraceStart + (CamRot.Vector() * InteractionDistance);
-	TArray<AActor*> ActorsToIgnore;
-	APawn* MyPawn = GetPawn(); if (MyPawn) { ActorsToIgnore.Add(MyPawn); }
-	FHitResult HitResult;
-	bool bHit = UKismetSystemLibrary::LineTraceSingle(
-		this, TraceStart, TraceEnd, ETraceTypeQuery::TraceTypeQuery1,
-		false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true
-	);
-	if (bHit && HitResult.GetActor())
+	UE_LOG(LogTemp, Error, TEXT("=== OnPossessInteract 被调用 ==="));
+    
+	APawn* CurrentPawn = GetPawn();
+	if (!CurrentPawn)
 	{
-		// [!! 简化：统一处理两种类型 !!]
-		APawn* TargetPawn = Cast<APawn>(HitResult.GetActor());
-		if (TargetPawn && 
-			(TargetPawn->IsA<APossessablePawn>() || TargetPawn->IsA<ACreatureCharacter>()))
+		UE_LOG(LogTemp, Warning, TEXT("当前没有控制任何Pawn"));
+		return;
+	}
+    
+	// [!! 检查当前是否在控制非法师角色 !!]
+	if (!CurrentPawn->IsA<AColorMageCharacter>())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("当前控制非法师角色: %s，执行取消附身"), *CurrentPawn->GetName());
+        
+		// 取消附身，返回法师角色
+		RequestRepossessOriginalCharacter();
+		return;
+	}
+    
+	// [!! 如果控制的是法师角色，尝试附身其他对象 !!]
+	UE_LOG(LogTemp, Error, TEXT("当前控制法师角色，检查附身目标"));
+	UE_LOG(LogTemp, Error, TEXT("当前准星类型: %d"), (int32)CurrentTargetType);
+    
+	// 使用Tick中已经检测到的高亮对象
+	if (CurrentTargetType == EReticleTargetType::Possessable && CurrentHighlightedActor.IsValid())
+	{
+		APawn* TargetPawn = Cast<APawn>(CurrentHighlightedActor.Get());
+		if (TargetPawn)
 		{
+			UE_LOG(LogTemp, Error, TEXT("尝试附身目标: %s"), *TargetPawn->GetName());
+            
 			UColorManagerSubsystem* ColorManager = GetWorld()->GetSubsystem<UColorManagerSubsystem>();
 			if (ColorManager)
 			{
-				ColorManager->AttemptPossession(this, TargetPawn); // [!! 统一调用 !!]
+				ColorManager->AttemptPossession(this, TargetPawn);
 			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("找不到ColorManagerSubsystem"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("高亮对象不是Pawn: %s"), *CurrentHighlightedActor.Get()->GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("没有可附身目标 - 准星类型: %d, 高亮对象存在: %s"), 
+			(int32)CurrentTargetType, 
+			CurrentHighlightedActor.IsValid() ? TEXT("是") : TEXT("否"));
+        
+		if (CurrentHighlightedActor.IsValid())
+		{
+			UE_LOG(LogTemp, Log, TEXT("高亮对象类型: %s"), *CurrentHighlightedActor.Get()->GetClass()->GetName());
 		}
 	}
 }
+
 // --- [!! GDD 修正结束 !!] ---
 
 void AColorMageController::RequestRepossessOriginalCharacter()
@@ -326,4 +369,120 @@ void AColorMageController::EnableInput(APlayerController* PlayerController)
 	InputMode.SetConsumeCaptureMouseDown(true); 
 	SetInputMode(InputMode);
 	
+}
+void AColorMageController::SetCameraForCreature(ACreatureCharacter* Creature)
+{
+	if (!Creature || !HiddenCharacter.IsValid()) return;
+	// [!! 关键：直接从隐藏的法师角色获取摄像机设置 !!]
+	AColorMageCharacter* MageCharacter = HiddenCharacter.Get();
+
+	UCharacterMovementComponent* CreatureMoveComp = Creature->GetCharacterMovement();
+	UCharacterMovementComponent* MageMoveComp = MageCharacter->GetCharacterMovement();
+    
+	if (CreatureMoveComp && MageMoveComp)
+	{
+		// 直接复制所有关键设置
+		CreatureMoveComp->bUseControllerDesiredRotation = MageMoveComp->bUseControllerDesiredRotation;
+		CreatureMoveComp->bOrientRotationToMovement = MageMoveComp->bOrientRotationToMovement;
+		CreatureMoveComp->RotationRate = MageMoveComp->RotationRate;
+        
+		UE_LOG(LogTemp, Warning, TEXT("生物移动设置已同步到法师设置"));
+	}
+	
+	if (USpringArmComponent* SpringArm = Creature->FindComponentByClass<USpringArmComponent>())
+	{
+		// 使用法师角色的摄像机设置，而不是生物自己的设置
+		SpringArm->TargetArmLength = MageCharacter->GetCameraDistance();     // 600.0f
+		SpringArm->SocketOffset = MageCharacter->GetCameraOffset();          // (0, 150, 60)
+		SpringArm->CameraLagSpeed = MageCharacter->GetCameraLagSpeed();      // 3.0f
+		SpringArm->bUsePawnControlRotation = true;
+		SpringArm->bEnableCameraLag = true;
+		SpringArm->bDoCollisionTest = true;
+     
+		UE_LOG(LogTemp, Warning, TEXT("生物 %s 使用法师摄像机设置: 距离=%f, 偏移=(%s)"), 
+			*Creature->GetName(), 
+			MageCharacter->GetCameraDistance(),
+			*MageCharacter->GetCameraOffset().ToString());
+	}
+}
+
+void AColorMageController::SetCameraForCharacterType(AColorMageCharacter* ColorMageChar)
+{
+	if (!ColorMageChar) 
+	{
+		UE_LOG(LogTemp, Error, TEXT("SetCameraForCharacterType: ColorMageChar 为空!"));
+		return;
+	}
+
+	// [!! 修改：从ColorMageCharacter类直接获取摄像机设置 !!]
+	if (USpringArmComponent* SpringArm = ColorMageChar->FindComponentByClass<USpringArmComponent>())
+	{
+		// 保存旧值用于调试
+		float OldLength = SpringArm->TargetArmLength;
+		FVector OldOffset = SpringArm->SocketOffset;
+        
+		// 使用角色定义的摄像机设置
+		SpringArm->TargetArmLength = ColorMageChar->GetCameraDistance(); 
+		SpringArm->SocketOffset = ColorMageChar->GetCameraOffset(); // 使用完整的偏移向量 (X, Y, Z)
+		SpringArm->CameraLagSpeed = ColorMageChar->GetCameraLagSpeed();
+		SpringArm->bEnableCameraLag = true;
+		SpringArm->bUsePawnControlRotation = true;
+		SpringArm->bDoCollisionTest = true;
+		
+		UE_LOG(LogTemp, Warning, TEXT("法师摄像机设置: %f->%f, Offset(%s)->(%s), 速度=%f"), 
+			OldLength, SpringArm->TargetArmLength,
+			*OldOffset.ToString(), *SpringArm->SocketOffset.ToString(),
+			ColorMageChar->GetCameraLagSpeed());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("法师角色 %s 没有SpringArmComponent!"), *ColorMageChar->GetName());
+        
+		// 调试：列出所有组件
+		TArray<UActorComponent*> Components = ColorMageChar->GetComponents().Array();
+		for (UActorComponent* Component : Components)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("找到组件: %s (类型: %s)"), 
+				*Component->GetName(), *Component->GetClass()->GetName());
+		}
+	}
+}
+
+
+FString AColorMageController::GetInteractionPrompt() const
+{
+	APawn* CurrentPawn = GetPawn();
+	if (!CurrentPawn)
+	{
+		return TEXT("");
+	}
+    
+	// 如果控制的不是法师角色，显示"取消附身"
+	if (!CurrentPawn->IsA<AColorMageCharacter>())
+	{
+		if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(CurrentPawn))
+		{
+			return FString::Printf(TEXT("按 [F] 离开 %s"), *Creature->GetName());
+		}
+		else if (APossessablePawn* Platform = Cast<APossessablePawn>(CurrentPawn))
+		{
+			return FString::Printf(TEXT("按 [F] 离开平台"));
+		}
+		return TEXT("按 [F] 返回法师");
+	}
+    
+	// 如果控制法师角色，检查是否有可附身目标
+	if (CurrentTargetType == EReticleTargetType::Possessable && CurrentHighlightedActor.IsValid())
+	{
+		if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(CurrentHighlightedActor.Get()))
+		{
+			return FString::Printf(TEXT("按 [F] 附身 %s"), *Creature->GetName());
+		}
+		else if (APossessablePawn* Platform = Cast<APossessablePawn>(CurrentHighlightedActor.Get()))
+		{
+			return TEXT("按 [F] 使用平台");
+		}
+	}
+    
+	return TEXT("");
 }
