@@ -140,6 +140,9 @@ protected:
 	/** 材质中控制毛笔尖颜色的参数名称 (保持不变) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visuals|Color")
 	FName BrushTipColorParameterName = "BrushTipColor";
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Offset")
+	float ProjectileSpawnForwardOffset = 500.0f;
 private:
 	// --- [!! GDD 修正：已清理 !!] ---
 	TObjectPtr<USpringArmComponent> CameraSpringArm;

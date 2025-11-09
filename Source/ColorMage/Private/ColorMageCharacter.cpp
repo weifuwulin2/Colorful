@@ -128,7 +128,7 @@ void AColorMageCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	{
 		// --- [!! GDD 修正 !!] ---
 		if (JumpAction) { EnhancedInputComp->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump); EnhancedInputComp->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping); }
-		if (DashAction) { EnhancedInputComp->BindAction(DashAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnDash); }
+		if (DashAction) { /*EnhancedInputComp->BindAction(DashAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnDash);*/ }
 		if (FireProjectileAction) { EnhancedInputComp->BindAction(FireProjectileAction, ETriggerEvent::Started, this, &AColorMageCharacter::OnFireProjectile); }
 		// [!! 已移除 !!] AimAction 绑定
 		// --- [!! GDD 修正结束 !!] ---
@@ -232,40 +232,47 @@ void AColorMageCharacter::SpawnProjectile_Internal()
 		UE_LOG(LogTemp, Error, TEXT("SpawnProjectile_Internal: 失败! 找不到 PlayerController!"));
 		return;
 	}
-
-	// 检查 ProjectileClass 是否已设置
 	if (!ProjectileClass)
 	{
 		UE_LOG(LogTemp, Error, TEXT("SpawnProjectile_Internal: 失败! ProjectileClass 未在蓝图中指定!"));
 		return;
 	}
-	// --- [!! 调试结束 !!] ---
 
-	// (使用最终的“射线检测”方案来确保命中准星)
-	FVector CameraLocation; FRotator CameraRotation;
+	// --- [!! 关键修复：简化的摄像机中心发射 !!] ---
+
+	// 1. 获取摄像机（屏幕中心）的视角
+	FVector CameraLocation; 
+	FRotator CameraRotation;
 	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-	FVector TraceStart = CameraLocation; FVector TraceEnd = TraceStart + (CameraRotation.Vector() * 10000.0f); 
-	FVector TargetLocation = TraceEnd; 
-	FHitResult HitResult; FCollisionQueryParams QueryParams; QueryParams.AddIgnoredActor(this); 
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
-	{
-		FVector DirectionToHit = (HitResult.Location - GetActorLocation()).GetSafeNormal();
-		if (FVector::DotProduct(GetActorForwardVector(), DirectionToHit) > -0.2f)
-		{
-			TargetLocation = HitResult.Location;
-		}
-	}
-	FVector SpawnLocation = GetMesh()->GetSocketLocation(ProjectileSpawnSocketName);
-	FRotator SpawnRotation = (TargetLocation - SpawnLocation).Rotation();
-	
-	// (投射物生成逻辑)
+
+	// 2. [!! 关键 !!] 投射物的“方向” = 摄像机的方向
+	FRotator SpawnRotation = CameraRotation;
+
+	// 3. 计算“前”向量
+	const FVector CameraForward = CameraRotation.Vector();
+
+	// 4. [!! 关键 !!] 投射物的“位置” = 摄像机位置 + 向前偏移
+	FVector SpawnLocation = CameraLocation + (CameraForward * ProjectileSpawnForwardOffset);
+
+	// [!! 已移除 !!] 移除了所有 Right/Up 偏移和射线检测逻辑
+	// --- [!! 修复结束 !!] ---
+    
+    
+	// --- (投射物生成逻辑) ---
 	AColorMagePlayerState* PS = PC->GetPlayerState<AColorMagePlayerState>(); if (!PS) return;
 	EColor ColorToFire = PS->GetCurrentColor();
-	FActorSpawnParameters SpawnParams; SpawnParams.Owner = this; SpawnParams.Instigator = this;
+	FActorSpawnParameters SpawnParams; 
+	SpawnParams.Owner = this; 
+	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	
-	AColorProjectile* Projectile = GetWorld()->SpawnActor<AColorProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams);
-	
+    
+	AColorProjectile* Projectile = GetWorld()->SpawnActor<AColorProjectile>(
+		ProjectileClass, 
+		SpawnLocation, // [!!] 使用我们新计算的位置
+		SpawnRotation, // [!!] 使用我们新计算的旋转
+		SpawnParams
+	);
+    
 	if (Projectile) 
 	{ 
 		Projectile->SetProjectileColor(ColorToFire); 
@@ -707,7 +714,4 @@ void AColorMageCharacter::RegenerateHealth()
 	CurrentHealth = FMath::Min(MaxHealth, CurrentHealth + 1);
     
 	UE_LOG(LogTemp, Log, TEXT("玩家回血：%d/%d"), CurrentHealth, MaxHealth);
-    
-	// 广播血量变化
-	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 }
