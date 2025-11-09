@@ -7,13 +7,19 @@
 #include "InputAction.h"
 #include "ColorMageController.h"
 #include "ColorMageGameMode.h"
+#include "HiddenPathActor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
+#include "RevealableInterface.h"
 #include "Components/BoxComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Components/SphereComponent.h"
+#include "Components/SpotLightComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+
 
 
 ACreatureCharacter::ACreatureCharacter()
@@ -21,18 +27,26 @@ ACreatureCharacter::ACreatureCharacter()
 	// 怪物需要 Tick 来执行 AI
 	PrimaryActorTick.bCanEverTick = true;
 	
-	// [!! 复制自 APossessablePawn !!]
-	// 创建“主”颜色组件 (用于附身匹配)
+	// [!! 关键 !!] 这是“主”颜色组件
 	ColorComponent = CreateDefaultSubobject<UColorComponent>(TEXT("MainColorComponent"));
 
-	// 创建退出点
 	CharacterExitPoint = CreateDefaultSubobject<USceneComponent>(TEXT("CharacterExitPoint"));
-	// [!! 关键 !!] 附加到 ACharacter 的根胶囊体
 	CharacterExitPoint->SetupAttachment(GetCapsuleComponent());
 	CharacterExitPoint->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
 
-	bCanBePossessed = true;
-	ControlType = EPawnControlType::Unknown; // 由子类蓝图（如 BP_HighJumper）设置
+	bCanBePossessed = false; // [!! 关键 !!] 默认不可附身，直到颜色统一
+	ControlType = EPawnControlType::Unknown; 
+
+	// --- [!! 复制自 AColorableActor !!] ---
+	LightVolume = CreateDefaultSubobject<USphereComponent>(TEXT("LightVolume"));
+	LightVolume->SetupAttachment(RootComponent);
+	LightVolume->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 默认关闭
+
+	// [!! 已移除 !!]
+	// PointLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("PointLight"));
+	// PointLight->SetupAttachment(RootComponent);
+	// PointLight->SetVisibility(false);
+
 }
 
 void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -45,7 +59,10 @@ void ACreatureCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	InitMaterials();
-	CheckColorUnity();
+	CheckForColorUnity(); // 检查初始颜色
+	
+	// 同步光照半径
+	LightVolume->SetSphereRadius(LightRadius);
 }
 void ACreatureCharacter::InitMaterials()
 {
@@ -193,12 +210,10 @@ void ACreatureCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// [!! GDD 逻辑 !!] 简单的示例 AI
-	// 如果没有被玩家附身 并且 处于敌对状态
+	// [!! GDD 怪物 AI Tick !!]
 	if (!IsPlayerControlled() && CurrentState == ECreatureState::Hostile)
 	{
-		// (在这里实现你的 AI 逻辑，比如 "向玩家移动")
-		// (这需要一个 AIController，并使用 AAIController::MoveToLocation/MoveToActor)
+		// (AI 移动逻辑由 AIController 处理)
 	}
 }
 
@@ -441,4 +456,79 @@ void ACreatureCharacter::PlayJumpAttackLand()
 	{
 		AnimInstance->Montage_Play(JumpAttackLandMontage);
 	}
+}
+
+void ACreatureCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController); // 调用父类
+
+	if (Cast<AColorMageController>(NewController))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CreatureCharacter %s: 被玩家附身。"), *GetName());
+       
+		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+		{
+			MoveComp->SetDefaultMovementMode(); 
+			MoveComp->GravityScale = 3.0f; // (你粘贴的值)
+		}
+		
+		// 立即调用一次，以同步当前状态的效果
+		HandleMainColorChange(GetColor(), GetColor()); 
+	}
+	// (如果是被 AI 附身, AIController::OnPossess 会处理)
+}
+
+// --- [!! 复制自 AColorableActor 的功能 (已修复) !!] ---
+void ACreatureCharacter::HandleMainColorChange(EColor NewColor, EColor OldColor)
+{
+    UE_LOG(LogTemp, Warning, TEXT("=== %s 颜色变化 (HandleMainColorChange): %d -> %d ==="), *GetName(), (int32)OldColor, (int32)NewColor);
+
+	// [!! 修正 !!] 如果旧颜色是黄色，清理光照
+	if (OldColor == EColor::EC_Yellow)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s: 离开黄色 - 关闭光照"), *GetName());
+		
+		for (AHiddenPathActor* Path : RevealedPaths)
+		{
+			if (IsValid(Path))
+			{
+				Path->Hide();
+			}
+		}
+		RevealedPaths.Empty();
+	}
+
+	// 处理光照逻辑（黄色）
+	if (NewColor == EColor::EC_Yellow)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s: 进入黄色 - 激活光照"), *GetName());
+        
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			TArray<FOverlapResult> OverlapResults;
+			FCollisionQueryParams QueryParams;
+			QueryParams.AddIgnoredActor(this);
+			bool bHasOverlaps = World->OverlapMultiByObjectType(
+				OverlapResults,
+				GetActorLocation(),
+				FQuat::Identity,
+				FCollisionObjectQueryParams(ECC_WorldStatic),
+				FCollisionShape::MakeSphere(LightRadius),
+				QueryParams
+			);
+
+			
+			for (const FOverlapResult& Result : OverlapResults)
+			{
+				if (AHiddenPathActor* Path = Cast<AHiddenPathActor>(Result.GetActor()))
+				{
+					Path->Reveal();
+					RevealedPaths.AddUnique(Path);
+				}
+			}
+		}
+	}
+
+
 }

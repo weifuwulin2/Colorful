@@ -8,11 +8,15 @@
 #include "GameFramework/Character.h"
 #include "CreatureCharacter.generated.h"
 
-class UColorComponent;
 class UInputAction;
+class UColorComponent;
+class UStaticMeshComponent;
 class USceneComponent;
+class USphereComponent;
+class AHiddenPathActor;     // 明确包含
+class ABurnableWoodActor;   // 明确包含
+class AColorMageCharacter;  // 明确包含
 class UNiagaraSystem;
-class UAnimMontage;
 
 
 USTRUCT(BlueprintType)
@@ -100,8 +104,9 @@ public:
     
     /** 播放跳跃攻击“落地”动画 */
     void PlayJumpAttackLand();
+    virtual void PossessedBy(AController* NewController) override;
+    void HandleMainColorChange(EColor NewColor, EColor OldColor);
     
-
 protected:
     virtual void BeginPlay() override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -114,9 +119,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Possession")
     TObjectPtr<USceneComponent> CharacterExitPoint;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    TObjectPtr<UInputAction> PossessAction;
-
+   
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
     EPawnControlType ControlType = EPawnControlType::Unknown;
 
@@ -125,13 +128,49 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effects")
     TObjectPtr<UNiagaraSystem> UnpossessVFX;
-
+    
     void OnUnpossess();
 
+    // --- [!! 复制自 AColorableActor (已修改) !!] ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions")
+    bool bReactsToMovementColors = false; 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions")
+    bool bReactsToLightColor = false; 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions")
+    bool bReactsToFireColor = false; 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions")
+    bool bReactsToLifeColor = false; 
+
+    // (移动 黑/白)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions|Movement")
+    float MoveDistance = 500.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions|Movement")
+    float MoveSpeed = 5.0f;
+
+    // (发光 黄)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    TObjectPtr<USphereComponent> LightVolume;
+    // [!! 已移除 !!] 
+    // TObjectPtr<USpotLightComponent> PointLight; 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions|Light")
+    float LightRadius = 500.0f;
+
+
+    // (生长 绿)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions|Life")
+    FVector StretchAmount = FVector(2.0, 2.0, 1.0);
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions|Life")
+    float GrowthTime = 2.0f;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions|Life")
+    FVector GrowthDirection;
     // --- [!! 现有怪物逻辑保持不变 !!] ---
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_CreatureState, Category = "Creature")
     ECreatureState CurrentState = ECreatureState::Hostile;
-
+    // === 光照相关 ===
+    UPROPERTY()
+    TArray<TObjectPtr<AHiddenPathActor>> RevealedPaths;
+    
     UFUNCTION()
     void OnRep_CreatureState();
 
@@ -159,7 +198,10 @@ protected:
     
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     TObjectPtr<UInputAction> MoveAction;
-    
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    TObjectPtr<UInputAction> PossessAction;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Creature|AI")
     float PatrolSpeed = 150.0f;
 

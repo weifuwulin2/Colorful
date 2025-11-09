@@ -24,17 +24,37 @@ void AHighJumperCreature::OnJumpPressed()
 	// [!! 高跳怪兽的特殊逻辑 !!]
 	switch (MyColor)
 	{
-	case EColor::EC_Green:
+	case EColor::EC_Black:
 		UE_LOG(LogTemp, Warning, TEXT("HighJumperCreature: 执行【超级高跳】！力度: %f"), SuperJumpForce);
 		LaunchCharacter(FVector(0, 0, SuperJumpForce), false, true);
 		break;
 	case EColor::EC_White:
-		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【白色中等跳】！"));
+		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【超级高跳】！"));
+		LaunchCharacter(FVector(0, 0, SuperJumpForce), false, true);
+		break;
+	case EColor::EC_Yellow:
+		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【中等跳】！"));
 		LaunchCharacter(FVector(0, 0, NormalJumpForce), false, true);
 		break;
-	default:
-		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行普通跳跃"));
-		Super::Jump(); // 使用ACharacter的默认跳跃
+	case EColor::EC_Green:
+		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【中等跳】！"));
+		LaunchCharacter(FVector(0, 0, NormalJumpForce), false, true);
+		break;
+	case EColor::EC_Orange:
+		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【中等跳】！"));
+		LaunchCharacter(FVector(0, 0, NormalJumpForce), false, true);
+		break;
+	case EColor::EC_Purple:
+		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【中等跳】！"));
+		LaunchCharacter(FVector(0, 0, NormalJumpForce), false, true);
+		break;
+	case EColor::EC_Red:
+		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【中等跳】！"));
+		LaunchCharacter(FVector(0, 0, NormalJumpForce), false, true);
+		break;
+	case EColor::EC_Blue:
+		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【中等跳】！"));
+		LaunchCharacter(FVector(0, 0, NormalJumpForce), false, true);
 		break;
 	}
 }
