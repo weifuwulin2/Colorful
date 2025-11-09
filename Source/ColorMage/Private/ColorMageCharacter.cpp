@@ -604,30 +604,88 @@ void AColorMageCharacter::OnPlayerColorChanged(EColor NewColor)
 	else { UE_LOG(LogTemp, Error, TEXT("BrushTipDMI 为空!")); }
 }
 
+// (这取代了你粘贴的函数，并添加了重生逻辑)
 void AColorMageCharacter::TakeDamage(int32 DamageAmount)
 {
-	if (DamageAmount <= 0) return;
+	int32 DamageInt = DamageAmount; // 将 float 转为 int
+
+    // 1. 检查状态
+    if (DamageInt <= 0 || CurrentHealth <= 0) return;
+
+    UAnimInstance* AnimInstance = (GetMesh()) ? GetMesh()->GetAnimInstance() : nullptr;
+
+    // 2. 检查无敌帧 (如果正在播放受击)
+    if (AnimInstance && GetHitMontage && AnimInstance->Montage_IsPlaying(GetHitMontage))
+    {
+        return; // 忽略伤害
+    }
+
+    // 3. 扣血
+    CurrentHealth = FMath::Max(0, CurrentHealth - DamageInt);
+    UE_LOG(LogTemp, Warning, TEXT("玩家受到 %d 点伤害，当前血量：%d/%d"), DamageInt, CurrentHealth, MaxHealth);
     
-	CurrentHealth = FMath::Max(0, CurrentHealth - DamageAmount);
+    // (可选) 广播血量变化
+    OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
     
-	UE_LOG(LogTemp, Warning, TEXT("玩家受到 %d 点伤害，当前血量：%d/%d"), DamageAmount, CurrentHealth, MaxHealth);
+    // (可选) 停止回血
+    // GetWorld()->GetTimerManager().ClearTimer(HealthRegenTimerHandle);
     
-	// 广播血量变化
-	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+    // 4. 检查是否死亡
+    if (CurrentHealth <= 0)
+    {
+       UE_LOG(LogTemp, Error, TEXT("玩家 %s 死亡！"), *GetName());
+       
+       // --- [!! 死亡重生逻辑 !!] ---
+       AnimInstance->Montage_Play(DeathMontage);
+
+       // b. 冻结、隐藏、禁用碰撞
+       if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+       {
+           MoveComp->StopMovementImmediately();
+           MoveComp->SetMovementMode(MOVE_None);
+       }
+       SetActorHiddenInGame(true);
+       SetActorEnableCollision(false);
+
+       // c. 获取 GameMode 和 Controller
+       AColorMageGameMode* MyGameMode = Cast<AColorMageGameMode>(UGameplayStatics::GetGameMode(this));
+       AController* MyController = GetController();
+
+       // d. 调用 GameMode 的重生序列
+       if (MyGameMode && MyController)
+       {
+           // GameMode 会处理“禁用输入”和“1秒延迟”
+           MyGameMode->RespawnPlayer(MyController);
+       }
+       else
+       {
+           UE_LOG(LogTemp, Error, TEXT("TakeDamage: 无法获取 GameMode 或 Controller 来重生!"));
+       }
+       
+       // --- [!! 死亡逻辑结束 !!] ---
+       
+       return; // 死亡后退出函数
+    }
+
+    // 5. (如果没死) 播放受击动画
+    if (AnimInstance && GetHitMontage)
+    {
+        AnimInstance->Montage_Play(GetHitMontage);
+        
+        // 打断动作
+        GetWorld()->GetTimerManager().ClearTimer(TimerHandle_SpawnProjectile);
+        GetWorld()->GetTimerManager().ClearTimer(TimerHandle_ResetFireRotation);
+        GetWorld()->GetTimerManager().ClearTimer(TimerHandle_AcquireColor);
+        GetWorld()->GetTimerManager().ClearTimer(TimerHandle_ResetAcquireRotation);
+
+        if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+        {
+            MoveComp->StopMovementImmediately();
+        }
+    }
     
-	// 停止当前的回血计时器
-	GetWorld()->GetTimerManager().ClearTimer(HealthRegenTimerHandle);
-    
-	// 检查是否死亡
-	if (CurrentHealth <= 0)
-	{
-		UE_LOG(LogTemp, Error, TEXT("玩家死亡！"));
-		// 这里可以添加死亡处理逻辑
-		return;
-	}
-    
-	// 开始回血倒计时
-	StartHealthRegeneration();
+    // 6. (可选) 开始回血倒计时
+    StartHealthRegeneration();
 }
 void AColorMageCharacter::StartHealthRegeneration()
 {

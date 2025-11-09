@@ -112,7 +112,11 @@ protected:
 	int32 HairMaterialSlotIndex = 0; 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visuals|Color")
 	FName HairColorParameterName = "HairTint";
-
+	/** 玩家被击中时播放的动画 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+	UAnimMontage* GetHitMontage;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+	UAnimMontage* DeathMontage;
 	// --- 毛笔设置 (已修改) ---
 	/**
 	 * [!! 新增 !!]

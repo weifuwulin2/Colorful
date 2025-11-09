@@ -7,6 +7,7 @@
 #include "Components/SplineComponent.h"
 #include "CreatureAIController.generated.h"
 
+class UNiagaraSystem;
 class AColorMageCharacter;
 class ACreatureCharacter;
 
@@ -98,11 +99,11 @@ protected:
     UPROPERTY(EditAnywhere, Category = "AI|Attack")
     float AttackDamage = 1.0f;
     UPROPERTY(EditAnywhere, Category = "AI|Attack")
-    float AttackCooldown = 5.0f;
+    float AttackCooldown = 3.0f;
     
     // [!! ADDED THIS LINE !!]
     UPROPERTY(EditAnywhere, Category = "AI|Attack")
-    float JumpAttackCooldown = 8.0f; // A separate, longer cooldown for the jump
+    float JumpAttackCooldown = 3.0f; // A separate, longer cooldown for the jump
 
     UPROPERTY(EditAnywhere, Category = "AI|Attack")
     float JumpAttackWindUpTime = 0.5f;
@@ -117,6 +118,10 @@ protected:
     FVector LockedJumpTarget;
     float JumpStartTime;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Attack")
+    class UNiagaraSystem* JumpAttackLandVFX;
+
+    UNiagaraSystem* ShockWave;
     void ExecuteJumpAttack();
     void ExecuteJumpTakeOff();
     void UpdateJumpMovement();

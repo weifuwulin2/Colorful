@@ -8,6 +8,7 @@
 #include "Navigation/PathFollowingComponent.h" 
 #include "ColorMageGameMode.h"
 #include "NavigationSystem.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Components/CapsuleComponent.h" // [!! FIX !!] 确保我们能获取到胶囊体
 
 // (Constructor remains the same)
@@ -519,24 +520,42 @@ void ACreatureAIController::PerformAreaAttack()
 {
     if (!ControlledCreature) return;
 
-    // [!! FIX !!] 落地后，立刻恢复碰撞
+    // [!! FIX !!] 落地后，立刻恢复碰撞 (你已有的代码)
     if (UCapsuleComponent* Capsule = ControlledCreature->GetCapsuleComponent())
     {
-        // 恢复为Pawn的标准碰撞
         Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     }
     
-    // 恢复正常移动模式
+    // 恢复正常移动模式 (你已有的代码)
     if (UCharacterMovementComponent* MoveComp = ControlledCreature->GetCharacterMovement())
     {
         MoveComp->SetMovementMode(MOVE_Walking);
         MoveComp->GravityScale = 1.0f;
     }
+
+    // --- [!! 新增逻辑：播放 VFX !!] ---
+    if (JumpAttackLandVFX)
+    {
+        FVector Location = ControlledCreature->GetActorLocation();
+        FRotator Rotation = ControlledCreature->GetActorRotation();
+
+        // 确保冲击波总是平坦地贴在地面上
+        Rotation.Pitch = 0.0f;
+        Rotation.Roll = 0.0f;
+
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            GetWorld(),
+            JumpAttackLandVFX,
+            Location,
+            Rotation
+        );
+    }
+    // --- [!! 新增逻辑结束 !!] ---
     
-    // 区域伤害逻辑 - 使用更大的攻击范围来补偿跳跃位置的偏移
+    // 区域伤害逻辑 (你已有的代码)
     TArray<FHitResult> HitResults;
     FVector AttackLocation = ControlledCreature->GetActorLocation();
-    FCollisionShape Sphere = FCollisionShape::MakeSphere(AttackRadius * 1.5f); // 增加攻击范围
+    FCollisionShape Sphere = FCollisionShape::MakeSphere(AttackRadius * 1.5f); 
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(ControlledCreature);
     
@@ -547,14 +566,22 @@ void ACreatureAIController::PerformAreaAttack()
         {
             if (AActor* HitActor = Hit.GetActor())
             {
-                UE_LOG(LogTemp, Warning, TEXT("Jump attack hit: %s"), *HitActor->GetName());
+                AColorMageCharacter* PlayerCharacter = Cast<AColorMageCharacter>(HitActor);
+                if (PlayerCharacter)
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("跳跃攻击 *成功* 命中玩家: %s"), *HitActor->GetName());
+                    PlayerCharacter->TakeDamage(2); 
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Log, TEXT("跳跃攻击命中了非玩家 Actor: %s"), *HitActor->GetName());
+                }
             }
         }
     }
     
     StartAttackCooldown();
 }
-
 
 void ACreatureAIController::StartAttackCooldown()
 {
