@@ -36,6 +36,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Effects")
 
 	virtual void PlayPossessEffect();
+
+	void RestoreFullHealth()
+	{
+		CurrentHealth = MaxHealth;
+	}
 	
 protected:
 	

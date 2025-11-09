@@ -61,8 +61,18 @@ void ACreatureCharacter::BeginPlay()
 	InitMaterials();
 	CheckForColorUnity(); // 检查初始颜色
 	
+	Super::BeginPlay();
+	InitMaterials();
+	CheckForColorUnity(); // 检查初始颜色
+    
 	// 同步光照半径
 	LightVolume->SetSphereRadius(LightRadius);
+    
+	// [!! 新增 !!] 连接主颜色组件的变化回调
+	if (ColorComponent)
+	{
+		ColorComponent->OnColorChanged.AddDynamic(this, &ACreatureCharacter::HandleMainColorChange);
+	}
 }
 void ACreatureCharacter::InitMaterials()
 {
@@ -403,6 +413,28 @@ void ACreatureCharacter::OnUnpossess()
 			MageController->RequestRepossessOriginalCharacter();
 		}
 	}
+	
+}
+
+void ACreatureCharacter::UnPossessed()
+{
+	// 当失去控制时也清理计时器
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(YellowLightTimerHandle);
+	}
+    
+	// 清理所有显示的路径
+	for (AHiddenPathActor* Path : RevealedPaths)
+	{
+		if (IsValid(Path))
+		{
+			Path->Hide();
+		}
+	}
+	RevealedPaths.Empty();
+    
+	Super::UnPossessed();
 }
 
 void ACreatureCharacter::FellOutOfWorld(const class UDamageType& dmgType)
@@ -478,16 +510,18 @@ void ACreatureCharacter::PossessedBy(AController* NewController)
 	// (如果是被 AI 附身, AIController::OnPossess 会处理)
 }
 
-// --- [!! 复制自 AColorableActor 的功能 (已修复) !!] ---
 void ACreatureCharacter::HandleMainColorChange(EColor NewColor, EColor OldColor)
 {
-    UE_LOG(LogTemp, Warning, TEXT("=== %s 颜色变化 (HandleMainColorChange): %d -> %d ==="), *GetName(), (int32)OldColor, (int32)NewColor);
+	UE_LOG(LogTemp, Warning, TEXT("=== %s 颜色变化 (HandleMainColorChange): %d -> %d ==="), *GetName(), (int32)OldColor, (int32)NewColor);
 
-	// [!! 修正 !!] 如果旧颜色是黄色，清理光照
+	// [!! 修正 !!] 如果旧颜色是黄色，清理光照和停止计时器
 	if (OldColor == EColor::EC_Yellow)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("%s: 离开黄色 - 关闭光照"), *GetName());
-		
+        
+		// 停止黄色光照的周期性检测
+		GetWorld()->GetTimerManager().ClearTimer(YellowLightTimerHandle);
+        
 		for (AHiddenPathActor* Path : RevealedPaths)
 		{
 			if (IsValid(Path))
@@ -503,32 +537,88 @@ void ACreatureCharacter::HandleMainColorChange(EColor NewColor, EColor OldColor)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("%s: 进入黄色 - 激活光照"), *GetName());
         
-		UWorld* World = GetWorld();
-		if (World)
-		{
-			TArray<FOverlapResult> OverlapResults;
-			FCollisionQueryParams QueryParams;
-			QueryParams.AddIgnoredActor(this);
-			bool bHasOverlaps = World->OverlapMultiByObjectType(
-				OverlapResults,
-				GetActorLocation(),
-				FQuat::Identity,
-				FCollisionObjectQueryParams(ECC_WorldStatic),
-				FCollisionShape::MakeSphere(LightRadius),
-				QueryParams
-			);
+		// 立即检测一次
+		UpdateYellowLight();
+        
+		// 启动周期性检测
+		GetWorld()->GetTimerManager().SetTimer(
+			YellowLightTimerHandle,
+			this,
+			&ACreatureCharacter::UpdateYellowLight,
+			YellowLightUpdateInterval,
+			true  // 循环执行
+		);
+	}
+}
 
-			
-			for (const FOverlapResult& Result : OverlapResults)
+void ACreatureCharacter::UpdateYellowLight()
+{
+	// 只有在黄色状态下才执行
+	if (GetColor() != EColor::EC_Yellow)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(YellowLightTimerHandle);
+		return;
+	}
+    
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	TArray<FOverlapResult> OverlapResults;
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+    
+	bool bHasOverlaps = World->OverlapMultiByObjectType(
+		OverlapResults,
+		GetActorLocation(),
+		FQuat::Identity,
+		FCollisionObjectQueryParams(ECC_WorldStatic),
+		FCollisionShape::MakeSphere(LightRadius),
+		QueryParams
+	);
+
+	// 当前帧检测到的路径
+	TArray<AHiddenPathActor*> CurrentFramePaths;
+    
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		if (AHiddenPathActor* Path = Cast<AHiddenPathActor>(Result.GetActor()))
+		{
+			CurrentFramePaths.Add(Path);
+            
+			// 如果是新发现的路径，显示它
+			if (!RevealedPaths.Contains(Path))
 			{
-				if (AHiddenPathActor* Path = Cast<AHiddenPathActor>(Result.GetActor()))
-				{
-					Path->Reveal();
-					RevealedPaths.AddUnique(Path);
-				}
+				Path->Reveal();
+				RevealedPaths.Add(Path);
+				UE_LOG(LogTemp, Warning, TEXT("%s: 发现新的隐藏路径: %s"), *GetName(), *Path->GetName());
 			}
 		}
 	}
+    
+	// 隐藏不再范围内的路径
+	for (int32 i = RevealedPaths.Num() - 1; i >= 0; i--)
+	{
+		AHiddenPathActor* Path = RevealedPaths[i];
+		if (!IsValid(Path) || !CurrentFramePaths.Contains(Path))
+		{
+			if (IsValid(Path))
+			{
+				Path->Hide();
+				UE_LOG(LogTemp, Warning, TEXT("%s: 隐藏路径: %s"), *GetName(), *Path->GetName());
+			}
+			RevealedPaths.RemoveAt(i);
+		}
+	}
+}
 
 
+void ACreatureCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 清理计时器
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(YellowLightTimerHandle);
+	}
+    
+	Super::EndPlay(EndPlayReason);
 }

@@ -26,7 +26,7 @@ void AHighJumperCreature::OnJumpPressed()
 	{
 	case EColor::EC_Black:
 		UE_LOG(LogTemp, Warning, TEXT("HighJumperCreature: 执行【超级高跳】！力度: %f"), SuperJumpForce);
-		LaunchCharacter(FVector(0, 0, SuperJumpForce), false, true);
+		LaunchCharacter(FVector(0, 0, NormalJumpForce), false, true);
 		break;
 	case EColor::EC_White:
 		UE_LOG(LogTemp, Log, TEXT("HighJumperCreature: 执行【超级高跳】！"));

@@ -4,6 +4,7 @@
 #include "ColorMageController.h"         // 需要包含玩家控制器
 #include "ColorMageCharacter.h"         // 需要包含玩家角色
 #include "ColorMagePlayerState.h"
+#include "CreatureCharacter.h"
 #include "NiagaraFunctionLibrary.h"
 #include "PossessablePawn.h"            // 需要包含可附身 Pawn
 #include "GameFramework/CharacterMovementComponent.h"
@@ -85,75 +86,111 @@ void AColorMageGameMode::DelayedRespawnLogic(AController* PlayerController)
 	AColorMageController* MageController = Cast<AColorMageController>(PlayerController);
     if (!MageController)
     {
-	   RespawningPlayers.Remove(PlayerController); // 清理集合
+	   RespawningPlayers.Remove(PlayerController); 
        return;
     }
 
-    // --- (这是你之前的 RespawnPlayer 逻辑) ---
-    APawn* CurrentPawn = MageController->GetPawn();
-    AColorMageCharacter* OriginalCharacter = MageController->HiddenCharacter.Get();
-	AColorMageCharacter* CharacterToRespawn = nullptr; 
+    // --- [!! 1. 识别掉下去的 Pawn !!] ---
+    APawn* FallingPawn = MageController->GetPawn(); // 这是掉下去的 Pawn
+    AColorMageCharacter* OriginalCharacter = MageController->HiddenCharacter.Get(); // 这是隐藏的法师
 
-	// 情况 1: 玩家在附身时掉落 (或死亡)
-    if (OriginalCharacter && CurrentPawn && CurrentPawn != OriginalCharacter)
+    APawn* PawnToTeleport = nullptr; // 我们最终要传送的 Pawn
+    AColorMageCharacter* CharacterToRestoreHealth = nullptr; // 我们需要回血的法师 (如果有)
+
+    // --- [!! 2. 决定重生哪个 Pawn !!] ---
+
+    // 情况 A: 玩家角色自己掉落
+    if (AColorMageCharacter* MageCharacter = Cast<AColorMageCharacter>(FallingPawn))
     {
-        UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 玩家附身在 %s。正在返回角色..."), *CurrentPawn->GetName());
-        CharacterToRespawn = OriginalCharacter;
-        MageController->Possess(CharacterToRespawn); // 这会触发 Character->PossessedBy()
-        MageController->HiddenCharacter = nullptr; 
-        if(IsValid(CurrentPawn)) { CurrentPawn->Destroy(); }
+        UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 玩家角色掉落。重生法师..."));
+        PawnToTeleport = MageCharacter;
+        CharacterToRestoreHealth = MageCharacter;
+        // (控制器已附身法师，无需操作)
     }
-	// 情况 2: 玩家角色自己掉落 (或死亡)
-    else if (!OriginalCharacter && Cast<AColorMageCharacter>(CurrentPawn))
+    // 情况 B: 玩家附身的【怪物】掉落
+    else if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(FallingPawn))
     {
-        UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 玩家角色 %s 掉落。正在传送..."), *CurrentPawn->GetName());
-        CharacterToRespawn = Cast<AColorMageCharacter>(CurrentPawn);
+        UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 附身的【怪物】掉落。重生怪物..."));
+        PawnToTeleport = Creature; // [!! 关键 !!] 我们要传送的是怪物
+        // (控制器保持附身怪物，无需操作)
+        // (怪物不需要回血，法师是安全的)
     }
-	// 情况 3: 发生了意外情况
-    else { /*... (你的 RestartPlayer 逻辑) ...*/ }
+    // 情况 C: 玩家附身的【平台】(或任何其他 Pawn) 掉落
+    else if (OriginalCharacter && FallingPawn)
+    {
+        UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 附身的【平台】 %s 掉落。重生法师..."), *FallingPawn->GetName());
+        
+        PawnToTeleport = OriginalCharacter;       // 我们要传送的是法师
+        CharacterToRestoreHealth = OriginalCharacter; // 我们要给法师回血
+        
+        MageController->Possess(OriginalCharacter); // 强制返回法师
+        MageController->HiddenCharacter = nullptr;
+        if (IsValid(FallingPawn)) { FallingPawn->Destroy(); } // 销毁掉下去的平台
+    }
+    // 情况 D: 发生意外
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("DelayedRespawnLogic: 状态未知! 尝试重启玩家..."));
+        RestartPlayer(MageController); 
+        PawnToTeleport = MageController->GetPawn();
+        CharacterToRestoreHealth = Cast<AColorMageCharacter>(PawnToTeleport);
+    }
     
-    // --- [!! 执行传送和视觉效果 !!] ---
-    if (CharacterToRespawn)
+    // --- [!! 3. 执行传送和恢复 !!] ---
+    if (PawnToTeleport)
     {
-       // 1. 传送到检查点
-       CharacterToRespawn->TeleportTo(LastCheckpointTransform.GetLocation(), LastCheckpointTransform.GetRotation().Rotator(), false, true);
+       // a. 传送到检查点
+       PawnToTeleport->TeleportTo(LastCheckpointTransform.GetLocation(), LastCheckpointTransform.GetRotation().Rotator(), false, true);
        
-	   // 2. [!! 新增 !!] 播放重生 VFX
+	   // b. 播放重生 VFX (在检查点位置)
 	   if (RespawnVFX)
 	   {
-		   UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-			   GetWorld(),
-			   RespawnVFX,
-			   LastCheckpointTransform.GetLocation(), // 在重生点播放
-			   LastCheckpointTransform.GetRotation().Rotator()
-		   );
+		   UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), RespawnVFX, LastCheckpointTransform.GetLocation(), LastCheckpointTransform.GetRotation().Rotator());
 	   }
 	   
-	   // 3. [!! 新增 !!] 让角色重新可见并启用碰撞
-	   CharacterToRespawn->SetActorHiddenInGame(false);
-	   CharacterToRespawn->SetActorEnableCollision(true);
+	   // c. [!! 关键 !!] 确保被传送的 Pawn 是可见的并已启用
+       // (这会处理法师的“取消隐藏”)
+	   PawnToTeleport->SetActorHiddenInGame(false);
+	   PawnToTeleport->SetActorEnableCollision(true);
 	   
-	   // 4. 重置移动组件
-       UCharacterMovementComponent* MoveComp = CharacterToRespawn->GetCharacterMovement();
-       if (MoveComp)
+	   // d. 重置移动组件
+       if (ACharacter* CharToReset = Cast<ACharacter>(PawnToTeleport))
        {
-           MoveComp->StopMovementImmediately(); 
-           MoveComp->SetDefaultMovementMode(); // 恢复为 Walking 或 Falling
-           MoveComp->GravityScale = CharacterToRespawn->DefaultGravityScale; 
+           if (UCharacterMovementComponent* MoveComp = CharToReset->GetCharacterMovement())
+           {
+               MoveComp->StopMovementImmediately(); 
+               MoveComp->SetMovementMode(MOVE_Falling); // 设为下落 (如果落地会自动变行走)
+               
+               // 恢复正确的重力
+               if (AColorMageCharacter* Mage = Cast<AColorMageCharacter>(CharToReset))
+               {
+                   MoveComp->GravityScale = Mage->DefaultGravityScale;
+               }
+               else
+               {
+                   MoveComp->GravityScale = 1.0f; // 怪物使用默认重力
+               }
+           }
+       }
+       
+       // e. [!! 关键 !!] 只在需要时恢复法师的血量
+       if (CharacterToRestoreHealth)
+       {
+           CharacterToRestoreHealth->RestoreFullHealth();
        }
 
-       // (可选：重置颜色)
-       // ... (PlayerState->Server_SetCurrentColor(EColor::EC_None)) ...
-       
-       UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: 角色 %s 已重生。"), *CharacterToRespawn->GetName());
+       UE_LOG(LogTemp, Log, TEXT("DelayedRespawnLogic: Pawn %s 已重生。"), *PawnToTeleport->GetName());
     }
-    else { /*... (Log Error) ...*/ }
+    else
+    {
+       UE_LOG(LogTemp, Error, TEXT("DelayedRespawnLogic: 重生失败，最终未能获取有效的 Pawn!"));
+    }
 	
-	// 5. 恢复玩家输入
+	// 4. 恢复玩家输入
 	UE_LOG(LogTemp, Warning, TEXT("DelayedRespawnLogic: 恢复玩家 %s 的输入。"), *PlayerController->GetName());
 	MageController->EnableInput(MageController);
 
-	// 6. 将玩家从“正在重生”集合中移除
+	// 5. 将玩家从“正在重生”集合中移除
 	RespawningPlayers.Remove(PlayerController);
 }
 bool AColorMageGameMode::IsPlayerRespawning(AController* PlayerController) const

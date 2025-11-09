@@ -130,6 +130,7 @@ protected:
     TObjectPtr<UNiagaraSystem> UnpossessVFX;
     
     void OnUnpossess();
+    virtual void UnPossessed()override;
 
     // --- [!! 复制自 AColorableActor (已修改) !!] ---
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Color Reactions")
@@ -242,7 +243,7 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (AllowPrivateAccess = "true"))
     float CameraHeight = 100.0f;    // 摄像机高度偏移
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (AllowPrivateAccess = "true"))
-    float CameraLagSpeed = 3.0f;    // 摄像机跟随速度
+    float CameraLagSpeed = 10.0f;    // 摄像机跟随速度
     public:
     // [!! 新增：获取摄像机设置的函数 !!]
     UFUNCTION(BlueprintPure, Category = "Camera")
@@ -255,5 +256,16 @@ protected:
     // --- [!! 动画 !!] ---
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
     TObjectPtr<UAnimMontage> JumpAttackLandMontage;
+
+private:
+    UPROPERTY()
+    FTimerHandle YellowLightTimerHandle;
     
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Light", meta = (AllowPrivateAccess = "true"))
+    float YellowLightUpdateInterval = 0.1f; // 黄色光照检测间隔
+    
+    // 周期性检测黄色光照的函数
+    UFUNCTION()
+    void UpdateYellowLight();
+    void EndPlay(EEndPlayReason::Type EndPlayReason);
 };

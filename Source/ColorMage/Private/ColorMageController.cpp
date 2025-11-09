@@ -310,51 +310,54 @@ void AColorMageController::OnPossessInteract()
 }
 
 // --- [!! GDD 修正结束 !!] ---
-
 void AColorMageController::RequestRepossessOriginalCharacter()
 {
 	if (HiddenCharacter.IsValid())
 	{
 		AColorMageCharacter* CharacterToRepossess = HiddenCharacter.Get();
 		APawn* CurrentPossessedPawn = GetPawn(); 
-		FTransform ExitTransform = CharacterToRepossess->GetActorTransform(); 
-        
+       
+		// [!! 修复：默认退出变换现在是“当前 Pawn”的位置 !!]
+		FTransform ExitTransform; 
+		if (!CurrentPossessedPawn)
+		{
+			// 极端情况：Pawn 不见了？
+			ExitTransform = CharacterToRepossess->GetActorTransform();
+		}
+		else
+		{
+			// 默认退出点是当前 Pawn 的位置
+			ExitTransform = CurrentPossessedPawn->GetActorTransform();
+		}
+		// [!! 修复结束 !!]
+
 		APossessablePawn* Possessable = nullptr;
-		ACreatureCharacter* Creature = nullptr; // [!! 新增 !!]
+		ACreatureCharacter* Creature = nullptr;
+
 		if (CurrentPossessedPawn)
 		{
 			Possessable = Cast<APossessablePawn>(CurrentPossessedPawn);
+			Creature = Cast<ACreatureCharacter>(CurrentPossessedPawn);
+           
+			// [!! 关键 !!] 检查 Pawn/Creature 是否设置了“自定义”退出点
+			// 如果是，则使用它。如果不是，ExitTransform 保持为 Pawn 的当前位置。
 			if (Possessable) 
 			{ 
 				ExitTransform = Possessable->GetCharacterExitTransform(); 
+				Possessable->PlayUnpossessEffect();
 			}
-			// [!! 新增：处理CreatureCharacter !!]
-			else if (Creature == Cast<ACreatureCharacter>(CurrentPossessedPawn))
+			else if (Creature) 
 			{
 				ExitTransform = Creature->GetCharacterExitTransform();
+				Creature->PlayUnpossessEffect();
 			}
-			else 
-			{ 
-				/* ... (备用退出点) ... */ 
-			}
-		}
-        
-		// --- [!! 关键修复：VFX !!] ---
-		// 1. 在"当前Pawn" (平台/生物) 的位置播放解除附身特效
-		if (Possessable)
-		{
-			Possessable->PlayUnpossessEffect();
-		}
-		// [!! 新增：CreatureCharacter的特效 !!]
-		else if (Creature)
-		{
-			Creature->PlayUnpossessEffect();
 		}
         
 		Super::Possess(CharacterToRepossess);
-		// [!! 关键 !!] 先传送，再播放特效
+
+		// [!! 关键 !!] 传送角色到（现在正确的）退出点
 		CharacterToRepossess->TeleportTo(ExitTransform.GetLocation(), ExitTransform.GetRotation().Rotator(), false, true);
-		CharacterToRepossess->PlayPossessEffect(); // 在新位置播放
+		CharacterToRepossess->PlayPossessEffect(); 
 		HiddenCharacter = nullptr;
 	}
 }

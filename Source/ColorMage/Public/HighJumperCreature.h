@@ -22,5 +22,5 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "High Jumper")
 	float SuperJumpForce = 3000.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "High Jumper")
-	float NormalJumpForce = 1000.0f;
+	float NormalJumpForce = 2000.0f;
 };
