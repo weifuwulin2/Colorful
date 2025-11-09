@@ -1,5 +1,4 @@
 #include "ColorMageCharacter.h"
-
 #include "ColorMageGameMode.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -11,9 +10,10 @@
 #include "EnhancedInputComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Kismet/GameplayStatics.h"
-#include "NiagaraSystem.h"           
 #include "NiagaraFunctionLibrary.h"
 #include "Components/CapsuleComponent.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense_Sight.h"
 
 AColorMageCharacter::AColorMageCharacter()
 {
@@ -35,6 +35,10 @@ AColorMageCharacter::AColorMageCharacter()
 		// 3. (重要!) 关闭毛笔自身的碰撞，防止它挡住玩家或射线
 		BrushMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
+
+	AIPerceptionStimuliSourceComponent = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("AIPerceptionStimuliSourceComponent"));
+	AIPerceptionStimuliSourceComponent->RegisterForSense(TSubclassOf<UAISense_Sight>());
+	AIPerceptionStimuliSourceComponent->RegisterWithPerceptionSystem();
 }
 
 void AColorMageCharacter::BeginPlay()

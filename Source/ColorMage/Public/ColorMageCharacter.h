@@ -11,6 +11,7 @@
 class UNiagaraSystem;
 class USpringArmComponent;
 class AColorProjectile;
+class UAIPerceptionStimuliSourceComponent;
 
 UCLASS()
 class COLORMAGE_API AColorMageCharacter : public ACharacter
@@ -215,4 +216,8 @@ protected:
     
 	void StartHealthRegeneration();
 	void RegenerateHealth();
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
+	TObjectPtr<UAIPerceptionStimuliSourceComponent> AIPerceptionStimuliSourceComponent;
 };

@@ -13,6 +13,7 @@
 #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Components/BoxComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 
 ACreatureCharacter::ACreatureCharacter()
@@ -291,21 +292,27 @@ void ACreatureCharacter::OnRep_CreatureState()
 	
 	if (CurrentState == ECreatureState::Hostile)
 	{
-		UE_LOG(LogTemp, Log, TEXT("Creature %s: AI State -> Hostile"), *GetName());
-		// (Restart AI logic)
-		// if (AI) { AI->RunBehaviorTree(...); }
+		UE_LOG(LogTemp, Log, TEXT("Creature %s: AI 状态 -> Hostile"), *GetName());
+		// (恢复 AI)
 	}
-	else // (CurrentState == ECreatureState::Unified)
+	else 
 	{
-		UE_LOG(LogTemp, Log, TEXT("CreatCure %s: AI State -> Unified (Tamed)"), *GetName());
+		UE_LOG(LogTemp, Log, TEXT("Creature %s: AI 状态 -> Unified (Tamed)"), *GetName());
 		
-		// --- [!! CORE FIX !!] ---
-		// Stop AI logic
-		if (AI && AI->GetPathFollowingComponent()) 
+		// 停止 AI 移动
+		if (AI) 
 		{ 
 			AI->StopMovement(); 
 		}
-		// --- [!! END FIX !!] ---
+
+		// [!! 修复 !!] 
+		// 确保生物在被“驯服”时恢复到正常的物理状态 (行走/下落)
+		// 这样它就不会卡在“飞行”模式
+		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+		{
+			MoveComp->SetDefaultMovementMode(); // 自动设为 Walking 或 Falling
+			MoveComp->GravityScale = 1.0f; // 确保重力恢复
+		}
 	}
 }
 
@@ -425,4 +432,30 @@ void ACreatureCharacter::OnUnhighlight_Implementation()
 {
 	UE_LOG(LogTemp, Warning, TEXT("CreatureCharacter取消高亮: %s"), *GetName());
 	// 移除高亮效果
+}
+
+// --- [!! 新增函数实现 !!] ---
+void ACreatureCharacter::PlayJumpAttackWindUp()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && JumpAttackWindUpMontage)
+	{
+		AnimInstance->Montage_Play(JumpAttackWindUpMontage);
+	}
+}
+void ACreatureCharacter::PlayJumpAttackTravel()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && JumpAttackTravelMontage)
+	{
+		AnimInstance->Montage_Play(JumpAttackTravelMontage);
+	}
+}
+void ACreatureCharacter::PlayJumpAttackLand()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && JumpAttackLandMontage)
+	{
+		AnimInstance->Montage_Play(JumpAttackLandMontage);
+	}
 }
