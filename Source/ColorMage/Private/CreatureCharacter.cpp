@@ -434,23 +434,6 @@ void ACreatureCharacter::OnUnhighlight_Implementation()
 	// 移除高亮效果
 }
 
-// --- [!! 新增函数实现 !!] ---
-void ACreatureCharacter::PlayJumpAttackWindUp()
-{
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (AnimInstance && JumpAttackWindUpMontage)
-	{
-		AnimInstance->Montage_Play(JumpAttackWindUpMontage);
-	}
-}
-void ACreatureCharacter::PlayJumpAttackTravel()
-{
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (AnimInstance && JumpAttackTravelMontage)
-	{
-		AnimInstance->Montage_Play(JumpAttackTravelMontage);
-	}
-}
 void ACreatureCharacter::PlayJumpAttackLand()
 {
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();

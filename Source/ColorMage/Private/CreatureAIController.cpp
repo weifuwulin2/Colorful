@@ -8,6 +8,7 @@
 #include "Navigation/PathFollowingComponent.h" 
 #include "ColorMageGameMode.h"
 #include "NavigationSystem.h"
+#include "Components/CapsuleComponent.h" // [!! FIX !!] 确保我们能获取到胶囊体
 
 // (Constructor remains the same)
 ACreatureAIController::ACreatureAIController()
@@ -15,8 +16,8 @@ ACreatureAIController::ACreatureAIController()
     PrimaryActorTick.bCanEverTick = true;
     AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerceptionComponent"));
     
-	UAISenseConfig_Sight* SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
-	// ... (SightConfig Setup) ...
+    UAISenseConfig_Sight* SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
+    // ... (SightConfig Setup) ...
     SightConfig->SightRadius = DetectionRadius;
     SightConfig->LoseSightRadius = DetectionRadius + 200.0f;
     SightConfig->PeripheralVisionAngleDegrees = 90.0f;
@@ -24,8 +25,8 @@ ACreatureAIController::ACreatureAIController()
     SightConfig->DetectionByAffiliation.bDetectEnemies = true;
     SightConfig->DetectionByAffiliation.bDetectFriendlies = false;
     SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
-	AIPerceptionComponent->ConfigureSense(*SightConfig);
-	AIPerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
+    AIPerceptionComponent->ConfigureSense(*SightConfig);
+    AIPerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
 }
 
 void ACreatureAIController::BeginPlay()
@@ -82,14 +83,21 @@ void ACreatureAIController::StopAI()
 {
     if (!bAIActive) return;
     // ... (Clear all timers) ...
-	GetWorld()->GetTimerManager().ClearAllTimersForObject(this);
+    GetWorld()->GetTimerManager().ClearAllTimersForObject(this);
     CurrentTarget = nullptr;
     CurrentAIState = EAIState::Patrolling;
     bAIActive = false;
     StopMovement();
 }
 
-void ACreatureAIController::SetPatrolSpline(AActor* SplineActor) { /* ... (Same) ... */ }
+void ACreatureAIController::SetPatrolSpline(AActor* SplineActor) 
+{
+    PatrolSplineActor = SplineActor;
+    if (PatrolSplineActor)
+    {
+        PatrolSpline = PatrolSplineActor->FindComponentByClass<USplineComponent>();
+    }
+}
 
 // --- [!! CORE FIX: Perception !!] ---
 void ACreatureAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
@@ -257,12 +265,17 @@ void ACreatureAIController::UpdateStrafing()
          return;
     }
 
+    // [!! FIX !!] Added checks for bCanAttack and bJumpAttackOnCooldown
     if (DistanceToPlayer <= AttackRadius)
     {
-        StopMovement(); 
-        ExecuteJumpAttack(); 
-        GetWorld()->GetTimerManager().ClearTimer(StrafeTimerHandle);
-        return;
+        if (bCanAttack && !bJumpAttackOnCooldown)
+        {
+            StopMovement(); 
+            ExecuteJumpAttack(); 
+            GetWorld()->GetTimerManager().ClearTimer(StrafeTimerHandle);
+            return;
+        }
+        // If on cooldown, do nothing and continue strafing
     }
 
     // Check if we finished our strafe path
@@ -299,8 +312,15 @@ void ACreatureAIController::GenerateRandomStrafeTarget()
             if (CurrentAIState == EAIState::Strafing && CurrentTarget && ControlledCreature)
             {
                 float DistanceToPlayer = FVector::Dist(ControlledCreature->GetActorLocation(), CurrentTarget->GetActorLocation());
-                if (DistanceToPlayer <= AttackRadius) { ExecuteJumpAttack(); }
-                else { GenerateRandomStrafeTarget(); }
+                // [!! FIX !!] Added bCanAttack and bJumpAttackOnCooldown checks
+                if (DistanceToPlayer <= AttackRadius && bCanAttack && !bJumpAttackOnCooldown) 
+                { 
+                    ExecuteJumpAttack(); 
+                }
+                else 
+                { 
+                    GenerateRandomStrafeTarget(); // Get new strafe point if not attacking or on cooldown
+                }
             }
         },
         RandomStrafeTime, false
@@ -325,17 +345,17 @@ FVector ACreatureAIController::GetRandomPointAroundPlayer(float Radius)
 void ACreatureAIController::SetNextPatrolTarget()
 {
     if (!PatrolSpline || PatrolSpline->GetNumberOfSplinePoints() < 2) return;
-	
+    
     // --- [!! CORE FIX 6: Patrol Rotation !!] ---
-	if (ControlledCreature && ControlledCreature->GetCharacterMovement())
-	{
-		ControlledCreature->GetCharacterMovement()->bOrientRotationToMovement = true;
-		ControlledCreature->GetCharacterMovement()->bUseControllerDesiredRotation = false;
-		ControlledCreature->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-	}
-	ClearFocus(EAIFocusPriority::Gameplay); 
+    if (ControlledCreature && ControlledCreature->GetCharacterMovement())
+    {
+       ControlledCreature->GetCharacterMovement()->bOrientRotationToMovement = true;
+       ControlledCreature->GetCharacterMovement()->bUseControllerDesiredRotation = false;
+       ControlledCreature->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+    }
+    ClearFocus(EAIFocusPriority::Gameplay); 
     // --- [!! END FIX !!] ---
-	
+    
     int32 TotalPoints = PatrolSpline->GetNumberOfSplinePoints();
     // ... (Patrol index logic) ...
     if (bPatrolForward) { CurrentPatrolIndex++; } else { CurrentPatrolIndex--; }
@@ -345,16 +365,54 @@ void ACreatureAIController::SetNextPatrolTarget()
     
     MoveTo(CurrentPatrolTarget); 
 }
-
-// --- [!! Fake Jump Attack Logic (Unchanged from No. 61) !!] ---
 void ACreatureAIController::ExecuteJumpAttack()
 {
-    if (!CurrentTarget || !ControlledCreature || CurrentAIState == EAIState::Attacking || CurrentAIState == EAIState::Cooldown)
+    // [!! FIX !!] Added !bCanAttack and bJumpAttackOnCooldown to the guard
+    if (!CurrentTarget || !ControlledCreature || !bCanAttack || bJumpAttackOnCooldown ||
+        CurrentAIState == EAIState::Attacking || CurrentAIState == EAIState::Cooldown)
         return;
+    
+    // 重要：设置攻击标志防止重复攻击
+    bCanAttack = false;
+    bJumpAttackOnCooldown = true; // [!! FIX !!] This attack is now on cooldown
     CurrentAIState = EAIState::Attacking;
-    StopMovement(); 
-    LockedJumpTarget = CurrentTarget->GetActorLocation();
-    ControlledCreature->PlayJumpAttackWindUp();
+    StopMovement();
+    
+    // 获取玩家位置
+    FVector TargetLocation = CurrentTarget->GetActorLocation();
+
+    // [!! FIX !!] Calculate target position relative to creature
+    // Get direction from creature to player (2D)
+    FVector DirectionToPlayer = (TargetLocation - ControlledCreature->GetActorLocation()).GetSafeNormal2D();
+    
+    // Land 200 units *behind* the player (from the creature's attack direction)
+    // This makes the creature jump "over" the player's initial position.
+    // This avoids landing on the player's head.
+    FVector JumpTarget = TargetLocation + (DirectionToPlayer * 200.0f);
+    
+    // [!! OLD CODE !!]
+    // FVector PlayerForward = CurrentTarget->GetActorForwardVector();
+    // FVector JumpTarget = TargetLocation + PlayerForward * 200.0f;
+    
+    // 重要：使用 JumpTarget 而不是 TargetLocation 进行地面检测
+    FVector TraceStart = JumpTarget + FVector(0, 0, 1000.0f);  // 修复：使用 JumpTarget
+    FVector TraceEnd = JumpTarget - FVector(0, 0, 1000.0f);     // 修复：使用 JumpTarget
+    
+    FHitResult HitResult;
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(ControlledCreature);
+    QueryParams.AddIgnoredActor(CurrentTarget);
+    
+    if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams))
+    {
+        LockedJumpTarget = HitResult.Location;
+    }
+    else
+    {
+        // 修复：使用 JumpTarget 而不是 TargetLocation
+        LockedJumpTarget = FVector(JumpTarget.X, JumpTarget.Y, 0.0f);
+    }
+    
     GetWorld()->GetTimerManager().ClearTimer(JumpAttackDelayTimerHandle);
     GetWorld()->GetTimerManager().SetTimer(
         JumpAttackDelayTimerHandle, this, &ACreatureAIController::ExecuteJumpTakeOff, JumpAttackWindUpTime, false
@@ -363,101 +421,194 @@ void ACreatureAIController::ExecuteJumpAttack()
 
 void ACreatureAIController::ExecuteJumpTakeOff()
 {
-	if (!ControlledCreature || !CurrentTarget) { StartAttackCooldown(); return; }
-	if (UCharacterMovementComponent* MoveComp = ControlledCreature->GetCharacterMovement())
-	{
-		MoveComp->StopMovementImmediately();
-		MoveComp->SetMovementMode(MOVE_Flying); 
-		MoveComp->GravityScale = 0.0f; 
-	}
-	ControlledCreature->PlayJumpAttackTravel(); 
-	JumpStartLocation = ControlledCreature->GetActorLocation();
-	JumpStartTime = GetWorld()->GetTimeSeconds();
-	GetWorld()->GetTimerManager().ClearTimer(JumpAttackTickTimerHandle);
-	GetWorld()->GetTimerManager().SetTimer(
-		JumpAttackTickTimerHandle, this, &ACreatureAIController::UpdateJumpMovement, GetWorld()->GetDeltaSeconds(), true 
-	);
+    if (!ControlledCreature || !CurrentTarget) 
+    { 
+        bCanAttack = true; // 重置攻击标志
+        StartAttackCooldown(); 
+        return; 
+    }
+    
+    // 确保仍在攻击状态
+    if (CurrentAIState != EAIState::Attacking)
+    {
+        bCanAttack = true;
+        return;
+    }
+    
+    // [!! FIX !!] 关闭碰撞，让怪物可以穿过玩家
+    if (UCapsuleComponent* Capsule = ControlledCreature->GetCapsuleComponent())
+    {
+        Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
+    
+    if (UCharacterMovementComponent* MoveComp = ControlledCreature->GetCharacterMovement())
+    {
+        MoveComp->StopMovementImmediately();
+        MoveComp->SetMovementMode(MOVE_Flying); 
+        MoveComp->GravityScale = 0.0f; 
+    }
+    
+    ControlledCreature->PlayJumpAttackLand();
+    
+    JumpStartLocation = ControlledCreature->GetActorLocation();
+    JumpStartTime = GetWorld()->GetTimeSeconds();
+    
+    GetWorld()->GetTimerManager().ClearTimer(JumpAttackTickTimerHandle);
+    GetWorld()->GetTimerManager().SetTimer(
+        JumpAttackTickTimerHandle, this, &ACreatureAIController::UpdateJumpMovement, 0.016f, true
+    );
 }
 
 void ACreatureAIController::UpdateJumpMovement()
 {
-	if (!ControlledCreature)
-	{
-		GetWorld()->GetTimerManager().ClearTimer(JumpAttackTickTimerHandle);
-		StartAttackCooldown();
-		return;
-	}
-	float ElapsedTime = GetWorld()->GetTimeSeconds() - JumpStartTime;
-	float Alpha = FMath::Clamp(ElapsedTime / JumpAttackTravelTime, 0.0f, 1.0f);
-	FVector NewLocation = FMath::Lerp(JumpStartLocation, LockedJumpTarget, Alpha);
-	float Arc = FMath::Sin(Alpha * PI) * JumpAttackArcHeight;
-	NewLocation.Z += Arc; 
-	ControlledCreature->SetActorLocation(NewLocation, false, nullptr, ETeleportType::None);
-	if (Alpha >= 1.0f)
-	{
-		GetWorld()->GetTimerManager().ClearTimer(JumpAttackTickTimerHandle);
-		PerformAreaAttack();
-	}
+    if (!ControlledCreature || CurrentAIState != EAIState::Attacking)
+    {
+        GetWorld()->GetTimerManager().ClearTimer(JumpAttackTickTimerHandle);
+        if (ControlledCreature)
+        {
+            // 恢复正常移动
+            if (UCharacterMovementComponent* MoveComp = ControlledCreature->GetCharacterMovement())
+            {
+                MoveComp->SetMovementMode(MOVE_Walking);
+                MoveComp->GravityScale = 1.0f;
+            }
+        }
+        bCanAttack = true;
+        StartAttackCooldown();
+        return;
+    }
+    
+    float ElapsedTime = GetWorld()->GetTimeSeconds() - JumpStartTime;
+    float Alpha = FMath::Clamp(ElapsedTime / JumpAttackTravelTime, 0.0f, 1.0f);
+    
+    FVector NewLocation = FMath::Lerp(JumpStartLocation, LockedJumpTarget, Alpha);
+    float Arc = FMath::Sin(Alpha * PI) * JumpAttackArcHeight;
+    NewLocation.Z += Arc;
+    
+    ControlledCreature->SetActorLocation(NewLocation, true, nullptr, ETeleportType::None);
+    
+    if (Alpha >= 1.0f)
+    {
+        GetWorld()->GetTimerManager().ClearTimer(JumpAttackTickTimerHandle);
+        FVector FinalLocation = LockedJumpTarget;
+        ControlledCreature->SetActorLocation(FinalLocation, true, nullptr, ETeleportType::None);
+        PerformAreaAttack();
+    }
 }
 
+void ACreatureAIController::CheckAndExecuteAttack()
+{
+    if (!CurrentTarget || !ControlledCreature || !bCanAttack || 
+        CurrentAIState == EAIState::Attacking || CurrentAIState == EAIState::Cooldown)
+            return;
+        
+    float DistanceToTarget = FVector::Dist(ControlledCreature->GetActorLocation(), CurrentTarget->GetActorLocation());
+    
+    if (DistanceToTarget <= AttackRadius)
+    {
+        // [!! FIX !!] Using AttackRadius here since JumpAttackRadius isn't in the .h
+        // And adding the bJumpAttackOnCooldown check
+        if (DistanceToTarget <= AttackRadius && !bJumpAttackOnCooldown)
+        {
+            ExecuteJumpAttack();
+        }
+        // 如果跳跃攻击在冷却中，就不攻击，继续移动
+    }
+}
 void ACreatureAIController::PerformAreaAttack()
 {
     if (!ControlledCreature) return;
-	if (UCharacterMovementComponent* MoveComp = ControlledCreature->GetCharacterMovement())
-	{
-		MoveComp->SetMovementMode(MOVE_Falling); 
-		MoveComp->GravityScale = 1.0f;
-	}
-    ControlledCreature->PlayJumpAttackLand();
-    // ... (Area damage logic) ...
-    TArray<FHitResult> HitResults; FVector AttackLocation = ControlledCreature->GetActorLocation(); FCollisionShape Sphere = FCollisionShape::MakeSphere(AttackRadius); FCollisionQueryParams QueryParams; QueryParams.AddIgnoredActor(ControlledCreature);
+
+    // [!! FIX !!] 落地后，立刻恢复碰撞
+    if (UCapsuleComponent* Capsule = ControlledCreature->GetCapsuleComponent())
+    {
+        // 恢复为Pawn的标准碰撞
+        Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    }
+    
+    // 恢复正常移动模式
+    if (UCharacterMovementComponent* MoveComp = ControlledCreature->GetCharacterMovement())
+    {
+        MoveComp->SetMovementMode(MOVE_Walking);
+        MoveComp->GravityScale = 1.0f;
+    }
+    
+    // 区域伤害逻辑 - 使用更大的攻击范围来补偿跳跃位置的偏移
+    TArray<FHitResult> HitResults;
+    FVector AttackLocation = ControlledCreature->GetActorLocation();
+    FCollisionShape Sphere = FCollisionShape::MakeSphere(AttackRadius * 1.5f); // 增加攻击范围
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(ControlledCreature);
+    
     bool bHit = GetWorld()->SweepMultiByChannel(HitResults, AttackLocation, AttackLocation, FQuat::Identity, ECC_Pawn, Sphere, QueryParams);
-    if (bHit) { /* ... Damage player ... */ }
+    if (bHit) 
+    { 
+        for (const FHitResult& Hit : HitResults)
+        {
+            if (AActor* HitActor = Hit.GetActor())
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Jump attack hit: %s"), *HitActor->GetName());
+            }
+        }
+    }
+    
     StartAttackCooldown();
 }
+
 
 void ACreatureAIController::StartAttackCooldown()
 {
     CurrentAIState = EAIState::Cooldown;
-    GetWorld()->GetTimerManager().SetTimer(
-        CooldownTimerHandle,
-        [this]() {
-            if (!ControlledCreature) return;
-            UCharacterMovementComponent* MoveComp = ControlledCreature->GetCharacterMovement();
-            if (!MoveComp) return;
-
-            if (CurrentTarget && IsValid(CurrentTarget))
+    
+    // 立即根据距离进入相应状态
+    if (CurrentTarget && IsValid(CurrentTarget))
+    {
+        UCharacterMovementComponent* MoveComp = ControlledCreature->GetCharacterMovement();
+        if (MoveComp)
+        {
+            float DistanceToPlayer = FVector::Dist(ControlledCreature->GetActorLocation(), CurrentTarget->GetActorLocation());
+            
+            if (DistanceToPlayer <= StrafeRadius)
             {
-				float DistanceToPlayer = FVector::Dist(ControlledCreature->GetActorLocation(), CurrentTarget->GetActorLocation());
-				if (DistanceToPlayer <= StrafeRadius)
-				{
-					CurrentAIState = EAIState::Strafing;
-					MoveComp->MaxWalkSpeed = StrafeSpeed;
-                    MoveComp->bOrientRotationToMovement = false; // Set strafe rotation
-                    MoveComp->bUseControllerDesiredRotation = true;
-                    SetFocus(CurrentTarget, EAIFocusPriority::Gameplay);
-					GenerateRandomStrafeTarget(); 
-				}
-				else
-				{
-					CurrentAIState = EAIState::Chasing; 
-					MoveComp->MaxWalkSpeed = ChaseSpeed;
-                    MoveComp->bOrientRotationToMovement = true; // Set chase rotation
-                    MoveComp->bUseControllerDesiredRotation = false;
-                    ClearFocus(EAIFocusPriority::Gameplay);
-					MoveToActor(CurrentTarget, StrafeRadius); 
-				}
+                CurrentAIState = EAIState::Strafing;
+                MoveComp->MaxWalkSpeed = StrafeSpeed;
+                MoveComp->bOrientRotationToMovement = false;
+                MoveComp->bUseControllerDesiredRotation = true;
+                SetFocus(CurrentTarget, EAIFocusPriority::Gameplay);
+                GenerateRandomStrafeTarget();
             }
             else
             {
-                CurrentAIState = EAIState::Patrolling;
-                MoveComp->MaxWalkSpeed = PatrolSpeed;
-                MoveComp->bOrientRotationToMovement = true; // Set patrol rotation
+                CurrentAIState = EAIState::Chasing;
+                MoveComp->MaxWalkSpeed = ChaseSpeed;
+                MoveComp->bOrientRotationToMovement = true;
                 MoveComp->bUseControllerDesiredRotation = false;
                 ClearFocus(EAIFocusPriority::Gameplay);
-                SetNextPatrolTarget();
+                MoveToActor(CurrentTarget, StrafeRadius);
             }
+        }
+    }
+    
+    // [!! FIX !!] Start TWO separate cooldown timers
+
+    // 1. General attack cooldown (bCanAttack)
+    GetWorld()->GetTimerManager().SetTimer(
+        CooldownTimerHandle,
+        [this]() {
+            bCanAttack = true;
+            // 重要：不要在这里立即检查攻击！
+            UE_LOG(LogTemp, Warning, TEXT("Attack cooldown finished, can attack again"));
         },
         AttackCooldown, false
+    );
+
+    // 2. Jump-specific attack cooldown (bJumpAttackOnCooldown)
+    GetWorld()->GetTimerManager().SetTimer(
+        JumpAttackSpecialCooldownHandle, // Use the handle from your .h file
+        [this]() {
+            bJumpAttackOnCooldown = false;
+            UE_LOG(LogTemp, Warning, TEXT("Jump Attack special cooldown finished"));
+        },
+        JumpAttackCooldown, false // Use the new variable you just added to the .h
     );
 }

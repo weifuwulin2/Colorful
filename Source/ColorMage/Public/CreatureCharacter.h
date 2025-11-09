@@ -97,11 +97,7 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "Creature")
     ECreatureState GetCurrentState() const { return CurrentState; }
-
-    /** 播放跳跃攻击“起跳”动画 */
-    void PlayJumpAttackWindUp();
-    /** 播放跳跃攻击“飞行”动画 (你需要添加这个) */
-    void PlayJumpAttackTravel();
+    
     /** 播放跳跃攻击“落地”动画 */
     void PlayJumpAttackLand();
     
@@ -215,10 +211,6 @@ protected:
     float GetCameraLagSpeed() const { return CameraLagSpeed; }
 
     // --- [!! 动画 !!] ---
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
-    TObjectPtr<UAnimMontage> JumpAttackWindUpMontage;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
-    TObjectPtr<UAnimMontage> JumpAttackTravelMontage; // [!! 新增 !!]
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
     TObjectPtr<UAnimMontage> JumpAttackLandMontage;
     
