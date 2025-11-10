@@ -87,6 +87,10 @@ void AColorMageController::Tick(float DeltaTime)
             }
             else if (ACreatureCharacter* Creature = Cast<ACreatureCharacter>(HitActor))
             {
+	            if (Creature)
+	            {
+	            	NewTargetType = EReticleTargetType::Paintable;
+	            }
             	AColorMagePlayerState* PS = GetPlayerState<AColorMagePlayerState>();
             	if (PS && PS->GetCurrentColor() != EColor::EC_None && 
 					PS->GetCurrentColor() == Creature->GetColor() && 
