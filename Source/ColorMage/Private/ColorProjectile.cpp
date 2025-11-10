@@ -23,7 +23,7 @@ AColorProjectile::AColorProjectile()
 		ProjectileMovementComponent->bShouldBounce = false;
 		ProjectileMovementComponent->ProjectileGravityScale = 0.0f;
 	}
-	InitialLifeSpan = 3.0f;
+	InitialLifeSpan = 1.0f;
 	ColorComponent = CreateDefaultSubobject<UColorComponent>(TEXT("ColorComponent"));
 }
 
@@ -86,6 +86,4 @@ void AColorProjectile::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, 
         return;
     }
 	
-	// 如果击中了没有 ColorComponent 的东西 (比如墙壁)，也销毁
-	Destroy();
 }
