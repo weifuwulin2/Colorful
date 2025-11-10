@@ -33,7 +33,7 @@ AColorableActor::AColorableActor()
     LightVolume->SetupAttachment(RootComponent);
     LightVolume->SetSphereRadius(LightRadius);
     LightVolume->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    LightVolume->SetHiddenInGame(false); // 调试时可见
+    LightVolume->SetHiddenInGame(true); // 调试时可见
 
     PointLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("PointLight"));
     PointLight->SetupAttachment(RootComponent);

@@ -13,7 +13,7 @@ AHiddenPathActor::AHiddenPathActor()
 	DetectionVolume->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore); // 先全部忽略
 	DetectionVolume->SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldDynamic, ECollisionResponse::ECR_Overlap); // 只对 WorldDynamic 重叠
 	DetectionVolume->SetGenerateOverlapEvents(true);
-	DetectionVolume->SetHiddenInGame(false); // [!! 调试时先设为可见 !!]
+	DetectionVolume->SetHiddenInGame(true); // [!! 调试时先设为可见 !!]
     
 	// 设置一个合理的大小
 	DetectionVolume->SetBoxExtent(FVector(100.0f, 100.0f, 50.0f));
