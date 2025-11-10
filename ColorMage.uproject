@@ -24,6 +24,11 @@
 		{
 			"Name": "GameplayStateTree",
 			"Enabled": true
+		},
+		{
+			"Name": "AdvancedOutlineSystem",
+			"Enabled": true,
+			"MarketplaceURL": "https://www.fab.com/listings/2a52e58e-b295-4bbd-9295-94e886e2f017"
 		}
 	]
 }
