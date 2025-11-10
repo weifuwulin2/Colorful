@@ -9,8 +9,7 @@
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [
-				"Engine",
-				"AIModule"
+				"Engine"
 			]
 		}
 	],
@@ -27,9 +26,9 @@
 			"Enabled": true
 		},
 		{
-			"Name": "BlueprintAssist",
+			"Name": "AdvancedOutlineSystem",
 			"Enabled": true,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/9e895371fa3a471c87337860d6f341ff"
+			"MarketplaceURL": "https://www.fab.com/listings/2a52e58e-b295-4bbd-9295-94e886e2f017"
 		}
 	]
 }
